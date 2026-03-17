@@ -1,0 +1,17 @@
+# Telegram Message Summarizer Configuration
+
+bot_token: "YOUR_BOT_TOKEN"
+openai_api_key: "YOUR_OPENAI_API_KEY"
+openai_model: "gpt-4.1-nano"
+
+# Default token limits per user per day
+default_limits:
+  input_tokens: 10000
+  output_tokens: 10000
+
+# Per-user overrides (by Telegram username, without @)
+users:
+  example_user:
+    limits:
+      input_tokens: 50000
+      output_tokens: 50000

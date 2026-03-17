@@ -34,16 +34,16 @@ Implement the complete Telegram message summarizer bot from scratch. The bot rec
 - Create: `tests/conftest.py`
 - Create: `.gitignore` entry for `data/config.yml` and `data/*.db`
 
-- [ ] Initialize pyproject.toml with project metadata, ruff config, pytest config
-- [ ] Create requirements.txt with all dependencies
-- [ ] Create config.py that loads YAML config from `data/config.yml` with defaults (bot token, OpenAI key, default limits 10k/10k, per-username overrides)
-- [ ] Create `data/config.example.yml` showing all options
-- [ ] Create __main__.py entry point (just imports and starts bot)
-- [ ] Ensure `data/` directory exists (create if missing at startup)
-- [ ] Add `data/config.yml` and `data/*.db` to .gitignore
-- [ ] Set up .venv, install deps
-- [ ] Write tests for config loading (default values, per-user overrides, missing file handling)
-- [ ] Run pytest - must pass before task 2
+- [x] Initialize pyproject.toml with project metadata, ruff config, pytest config
+- [x] Create requirements.txt with all dependencies
+- [x] Create config.py that loads YAML config from `data/config.yml` with defaults (bot token, OpenAI key, default limits 10k/10k, per-username overrides)
+- [x] Create `data/config.example.yml` showing all options
+- [x] Create __main__.py entry point (just imports and starts bot)
+- [x] Ensure `data/` directory exists (create if missing at startup)
+- [x] Add `data/config.yml` and `data/*.db` to .gitignore
+- [x] Set up .venv, install deps
+- [x] Write tests for config loading (default values, per-user overrides, missing file handling)
+- [x] Run pytest - must pass before task 2
 
 ### Task 2: User manager with token tracking and limits
 
