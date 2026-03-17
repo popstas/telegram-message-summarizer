@@ -1,14 +1,10 @@
-from telegram_summarizer.config import ensure_data_dir, load_config
+from telegram_summarizer.bot import run_bot
+from telegram_summarizer.config import ensure_data_dir
 
 
 def main() -> None:
     ensure_data_dir()
-    config = load_config()
-    if not config["bot_token"]:
-        print("Error: bot_token not set in data/config.yml")
-        return
-    # Bot startup will be implemented in Task 5
-    print("Bot starting... (not yet implemented)")
+    run_bot()
 
 
 if __name__ == "__main__":

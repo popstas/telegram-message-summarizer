@@ -93,18 +93,18 @@ Implement the complete Telegram message summarizer bot from scratch. The bot rec
 - Create: `telegram_summarizer/handlers.py`
 - Create: `tests/test_handlers.py`
 
-- [ ] Set up bot with python-telegram-bot (or aiogram, pick one)
-- [ ] Handle forwarded messages: collect into per-user buffer, extract text and media info
-- [ ] After forwarding batch (timeout or explicit trigger), show inline keyboard form: processing level (min/mid/max), format (markdown/pdf/docx), save media (yes/no)
-- [ ] Handle callback queries to update form selections
-- [ ] On confirm: send status message, call summarizer, call exporter, edit status message with result
-- [ ] For pdf/docx: send result as file attachment
-- [ ] For media save=yes with pdf/docx: attach forwarded media files
-- [ ] Ignore media for markdown format
-- [ ] Check user limits before processing, reject if exceeded
-- [ ] Record token usage after successful processing
-- [ ] Write tests: message collection, form building, callback handling (with mocked bot API)
-- [ ] Run pytest - must pass before task 6
+- [x] Set up bot with python-telegram-bot (or aiogram, pick one)
+- [x] Handle forwarded messages: collect into per-user buffer, extract text and media info
+- [x] After forwarding batch (timeout or explicit trigger), show inline keyboard form: processing level (min/mid/max), format (markdown/pdf/docx), save media (yes/no)
+- [x] Handle callback queries to update form selections
+- [x] On confirm: send status message, call summarizer, call exporter, edit status message with result
+- [x] For pdf/docx: send result as file attachment
+- [x] For media save=yes with pdf/docx: attach forwarded media files
+- [x] Ignore media for markdown format
+- [x] Check user limits before processing, reject if exceeded
+- [x] Record token usage after successful processing
+- [x] Write tests: message collection, form building, callback handling (with mocked bot API)
+- [x] Run pytest - must pass before task 6
 
 ### Task 6: Docker setup
 
