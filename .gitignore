@@ -7,3 +7,4 @@ data/*.db
 
 # ralphex progress logs
 .ralphex/progress/
+.coverage
