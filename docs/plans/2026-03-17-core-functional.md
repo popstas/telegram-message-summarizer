@@ -51,15 +51,15 @@ Implement the complete Telegram message summarizer bot from scratch. The bot rec
 - Create: `telegram_summarizer/user_manager.py`
 - Create: `tests/test_user_manager.py`
 
-- [ ] Implement UserManager class using SQLite storage at `data/users.db`
-- [ ] Store per-user: username, input_tokens_today, output_tokens_today, input_tokens_total, output_tokens_total, last_reset_date
-- [ ] Implement daily reset logic (reset counters when date changes)
-- [ ] Implement check_limits(username, input_tokens, output_tokens) - returns bool
-- [ ] Implement record_usage(username, input_tokens, output_tokens)
-- [ ] Implement get_stats(username) - returns usage dict
-- [ ] Reject users without username
-- [ ] Write tests: limit checking, usage recording, daily reset, no-username rejection
-- [ ] Run pytest - must pass before task 3
+- [x] Implement UserManager class using SQLite storage at `data/users.db`
+- [x] Store per-user: username, input_tokens_today, output_tokens_today, input_tokens_total, output_tokens_total, last_reset_date
+- [x] Implement daily reset logic (reset counters when date changes)
+- [x] Implement check_limits(username, input_tokens, output_tokens) - returns bool
+- [x] Implement record_usage(username, input_tokens, output_tokens)
+- [x] Implement get_stats(username) - returns usage dict
+- [x] Reject users without username
+- [x] Write tests: limit checking, usage recording, daily reset, no-username rejection
+- [x] Run pytest - must pass before task 3
 
 ### Task 3: Summarizer with OpenAI Agents SDK
 
