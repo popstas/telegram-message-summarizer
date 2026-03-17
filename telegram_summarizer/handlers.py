@@ -161,7 +161,7 @@ async def _show_form_after_timeout(update: Update, context: ContextTypes.DEFAULT
     except asyncio.CancelledError:
         return
     session = get_session(user_id)
-    if not session.messages:
+    if not session.messages and not session.media_file_ids:
         return
 
     text = _build_form_text(session)
@@ -178,7 +178,7 @@ async def process_command_handler(update: Update, context: ContextTypes.DEFAULT_
     user_id = update.effective_user.id
     session = get_session(user_id)
 
-    if not session.messages:
+    if not session.messages and not session.media_file_ids:
         await update.message.reply_text("No forwarded messages collected. Forward some messages first.")
         return
 
@@ -229,6 +229,13 @@ async def _process_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, u
 
     # Send status message
     await query.edit_message_text("Processing your messages...")
+
+    if not session.messages:
+        await query.edit_message_text(
+            "No text messages to summarize. Only media files were forwarded."
+        )
+        clear_session(user_id)
+        return
 
     # Check limits with estimated input tokens
     user_manager = context.bot_data["user_manager"]

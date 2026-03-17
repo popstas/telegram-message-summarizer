@@ -22,17 +22,21 @@ class UserManager:
         return conn
 
     def _init_db(self) -> None:
-        with self._get_conn() as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS users (
-                    username TEXT PRIMARY KEY,
-                    input_tokens_today INTEGER NOT NULL DEFAULT 0,
-                    output_tokens_today INTEGER NOT NULL DEFAULT 0,
-                    input_tokens_total INTEGER NOT NULL DEFAULT 0,
-                    output_tokens_total INTEGER NOT NULL DEFAULT 0,
-                    last_reset_date TEXT NOT NULL
-                )
-            """)
+        conn = self._get_conn()
+        try:
+            with conn:
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS users (
+                        username TEXT PRIMARY KEY,
+                        input_tokens_today INTEGER NOT NULL DEFAULT 0,
+                        output_tokens_today INTEGER NOT NULL DEFAULT 0,
+                        input_tokens_total INTEGER NOT NULL DEFAULT 0,
+                        output_tokens_total INTEGER NOT NULL DEFAULT 0,
+                        last_reset_date TEXT NOT NULL
+                    )
+                """)
+        finally:
+            conn.close()
 
     def _ensure_user(self, conn: sqlite3.Connection, username: str) -> None:
         conn.execute(
@@ -70,13 +74,17 @@ class UserManager:
 
         limits = get_user_limits(config, username)
 
-        with self._get_conn() as conn:
-            self._ensure_user(conn, username)
-            self._maybe_reset_daily(conn, username)
-            row = conn.execute(
-                "SELECT input_tokens_today, output_tokens_today FROM users WHERE username = ?",
-                (username,),
-            ).fetchone()
+        conn = self._get_conn()
+        try:
+            with conn:
+                self._ensure_user(conn, username)
+                self._maybe_reset_daily(conn, username)
+                row = conn.execute(
+                    "SELECT input_tokens_today, output_tokens_today FROM users WHERE username = ?",
+                    (username,),
+                ).fetchone()
+        finally:
+            conn.close()
 
         current_input = row["input_tokens_today"] if row else 0
         current_output = row["output_tokens_today"] if row else 0
@@ -91,29 +99,37 @@ class UserManager:
         if not username:
             raise NoUsernameError("User must have a Telegram username")
 
-        with self._get_conn() as conn:
-            self._ensure_user(conn, username)
-            self._maybe_reset_daily(conn, username)
-            conn.execute(
-                """
-                UPDATE users
-                SET input_tokens_today = input_tokens_today + ?,
-                    output_tokens_today = output_tokens_today + ?,
-                    input_tokens_total = input_tokens_total + ?,
-                    output_tokens_total = output_tokens_total + ?
-                WHERE username = ?
-                """,
-                (input_tokens, output_tokens, input_tokens, output_tokens, username),
-            )
+        conn = self._get_conn()
+        try:
+            with conn:
+                self._ensure_user(conn, username)
+                self._maybe_reset_daily(conn, username)
+                conn.execute(
+                    """
+                    UPDATE users
+                    SET input_tokens_today = input_tokens_today + ?,
+                        output_tokens_today = output_tokens_today + ?,
+                        input_tokens_total = input_tokens_total + ?,
+                        output_tokens_total = output_tokens_total + ?
+                    WHERE username = ?
+                    """,
+                    (input_tokens, output_tokens, input_tokens, output_tokens, username),
+                )
+        finally:
+            conn.close()
 
     def get_stats(self, username: str | None) -> dict:
         if not username:
             raise NoUsernameError("User must have a Telegram username")
 
-        with self._get_conn() as conn:
-            self._ensure_user(conn, username)
-            self._maybe_reset_daily(conn, username)
-            row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+        conn = self._get_conn()
+        try:
+            with conn:
+                self._ensure_user(conn, username)
+                self._maybe_reset_daily(conn, username)
+                row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+        finally:
+            conn.close()
 
         return {
             "username": row["username"],
