@@ -28,9 +28,8 @@ def mock_runner():
 
 @pytest.fixture
 def mock_config():
-    with patch("telegram_summarizer.summarizer.load_config") as mock:
-        mock.return_value = {"openai_model": "gpt-4.1-nano"}
-        yield mock
+    """No longer needed since summarize() takes model param directly, but kept for compatibility."""
+    yield
 
 
 @pytest.mark.asyncio
@@ -108,16 +107,17 @@ async def test_summarize_multiple_responses(mock_runner, mock_config):
     result = await summarize("text", "mid")
 
     assert result.text == "Final"
-    # Usage.add is called on real Usage object, so tokens accumulate
     assert isinstance(result, SummaryResult)
+    # Usage.add accumulates tokens from both responses
+    assert result.input_tokens > 0
+    assert result.output_tokens > 0
 
 
 @pytest.mark.asyncio
 async def test_summarize_uses_configured_model(mock_runner, mock_config):
-    mock_config.return_value = {"openai_model": "gpt-5-nano"}
     mock_runner.run.return_value = _make_mock_result()
 
-    await summarize("text", "min")
+    await summarize("text", "min", model="gpt-5-nano")
 
     agent_arg = mock_runner.run.call_args[0][0]
     assert agent_arg.model == "gpt-5-nano"

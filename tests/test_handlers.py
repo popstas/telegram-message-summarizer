@@ -387,6 +387,84 @@ class TestCallbackHandler:
         assert call_kwargs["filename"] == "summary.docx"
 
     @pytest.mark.asyncio
+    async def test_confirm_summarize_error(self):
+        session = get_session(123)
+        session.messages = ["test message"]
+
+        update = self._make_callback_update("confirm")
+        context = make_context()
+
+        with (
+            patch(
+                "telegram_summarizer.handlers.summarize",
+                new_callable=AsyncMock,
+                side_effect=RuntimeError("API connection failed"),
+            ),
+            patch("telegram_summarizer.handlers.UserManager") as MockUM,
+        ):
+            mock_um = MockUM.return_value
+            mock_um.check_limits.return_value = True
+
+            await callback_handler(update, context)
+
+        calls = update.callback_query.edit_message_text.call_args_list
+        last_text = calls[-1][0][0]
+        assert "failed" in last_text.lower()
+        # Should NOT expose internal error details
+        assert "API connection failed" not in last_text
+        # Session should be cleared
+        new_session = get_session(123)
+        assert new_session.messages == []
+
+    @pytest.mark.asyncio
+    async def test_confirm_post_summarization_limit_exceeded(self):
+        session = get_session(123)
+        session.messages = ["test message"]
+
+        update = self._make_callback_update("confirm")
+        context = make_context()
+
+        mock_result = MagicMock()
+        mock_result.text = "Summary text"
+        mock_result.input_tokens = 50000
+        mock_result.output_tokens = 50000
+
+        with (
+            patch("telegram_summarizer.handlers.summarize", new_callable=AsyncMock, return_value=mock_result),
+            patch("telegram_summarizer.handlers.UserManager") as MockUM,
+        ):
+            mock_um = MockUM.return_value
+            # First check passes (estimated), second check fails (actual usage)
+            mock_um.check_limits.side_effect = [True, False]
+            mock_um.record_usage = MagicMock()
+
+            await callback_handler(update, context)
+
+        calls = update.callback_query.edit_message_text.call_args_list
+        last_text = calls[-1][0][0]
+        assert "limit" in last_text.lower()
+        # Usage should NOT be recorded
+        mock_um.record_usage.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_callback_invalid_level_ignored(self):
+        get_session(123)
+        update = self._make_callback_update("level:invalid")
+        context = make_context()
+        await callback_handler(update, context)
+        session = get_session(123)
+        assert session.level == "mid"  # Default unchanged
+
+    @pytest.mark.asyncio
+    async def test_callback_invalid_format_ignored(self):
+        get_session(123)
+        update = self._make_callback_update("fmt:invalid")
+        context = make_context()
+        await callback_handler(update, context)
+        session = get_session(123)
+        assert session.fmt == "markdown"  # Default unchanged
+
+    @pytest.mark.asyncio
     async def test_confirm_limit_exceeded(self):
         session = get_session(123)
         session.messages = ["test message"]

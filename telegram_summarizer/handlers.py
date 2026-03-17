@@ -6,9 +6,12 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
 from telegram_summarizer.config import get_user_limits
-from telegram_summarizer.exporter import export_docx, export_markdown, export_pdf
-from telegram_summarizer.summarizer import summarize
+from telegram_summarizer.exporter import export_docx, export_pdf
+from telegram_summarizer.summarizer import LEVEL_PROMPTS, summarize
 from telegram_summarizer.user_manager import NoUsernameError, UserManager
+
+VALID_FORMATS = {"markdown", "pdf", "docx"}
+TELEGRAM_MSG_LIMIT = 4096
 
 logger = logging.getLogger(__name__)
 
@@ -140,19 +143,23 @@ async def forwarded_message_handler(update: Update, context: ContextTypes.DEFAUL
     session.batch_task = asyncio.create_task(_show_form_after_timeout(update, context, user_id))
 
 
-async def _show_form_after_timeout(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int) -> None:
-    await asyncio.sleep(BATCH_TIMEOUT_SECONDS)
-    session = get_session(user_id)
-    if not session.messages:
-        return
-
+def _build_form_text(session: UserSession) -> str:
     msg_count = len(session.messages)
     media_count = len(session.media_file_ids)
     text = f"Collected {msg_count} message(s)"
     if media_count:
         text += f" with {media_count} media file(s)"
     text += ".\nChoose options and confirm:"
+    return text
 
+
+async def _show_form_after_timeout(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int) -> None:
+    await asyncio.sleep(BATCH_TIMEOUT_SECONDS)
+    session = get_session(user_id)
+    if not session.messages:
+        return
+
+    text = _build_form_text(session)
     keyboard = build_form_keyboard(session)
     await update.message.reply_text(text, reply_markup=keyboard)
 
@@ -174,13 +181,7 @@ async def process_command_handler(update: Update, context: ContextTypes.DEFAULT_
     if session.batch_task and not session.batch_task.done():
         session.batch_task.cancel()
 
-    msg_count = len(session.messages)
-    media_count = len(session.media_file_ids)
-    text = f"Collected {msg_count} message(s)"
-    if media_count:
-        text += f" with {media_count} media file(s)"
-    text += ".\nChoose options and confirm:"
-
+    text = _build_form_text(session)
     keyboard = build_form_keyboard(session)
     await update.message.reply_text(text, reply_markup=keyboard)
 
@@ -198,9 +199,13 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return
 
     if data.startswith("level:"):
-        session.level = data.split(":")[1]
+        value = data.split(":")[1]
+        if value in LEVEL_PROMPTS:
+            session.level = value
     elif data.startswith("fmt:"):
-        session.fmt = data.split(":")[1]
+        value = data.split(":")[1]
+        if value in VALID_FORMATS:
+            session.fmt = value
     elif data.startswith("media:"):
         session.save_media = data.split(":")[1] == "yes"
 
@@ -217,20 +222,20 @@ async def _process_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, u
     # Send status message
     await query.edit_message_text("Processing your messages...")
 
-    # Check limits
+    # Check limits with estimated input tokens
     user_manager = UserManager()
-    if not user_manager.check_limits(username, 0, 0, config):
+    combined_text = "\n\n---\n\n".join(session.messages)
+    estimated_input = len(combined_text) // 4
+    if not user_manager.check_limits(username, estimated_input, 0, config):
         await query.edit_message_text("Daily token limit exceeded. Try again tomorrow.")
         clear_session(user_id)
         return
-
-    # Summarize
-    combined_text = "\n\n---\n\n".join(session.messages)
     try:
-        result = await summarize(combined_text, session.level)
+        model = config.get("openai_model", "gpt-4.1-nano")
+        result = await summarize(combined_text, session.level, model=model)
     except Exception as e:
-        logger.error("Summarization failed: %s", e)
-        await query.edit_message_text(f"Summarization failed: {e}")
+        logger.error("Summarization failed: %s", e, exc_info=True)
+        await query.edit_message_text("Summarization failed. Please try again later.")
         clear_session(user_id)
         return
 
@@ -245,8 +250,13 @@ async def _process_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, u
 
     # Export
     if session.fmt == "markdown":
-        text = export_markdown(result.text)
-        await query.edit_message_text(text)
+        text = result.text
+        if len(text) > TELEGRAM_MSG_LIMIT:
+            await query.edit_message_text(text[:TELEGRAM_MSG_LIMIT])
+            for i in range(TELEGRAM_MSG_LIMIT, len(text), TELEGRAM_MSG_LIMIT):
+                await query.message.reply_text(text[i : i + TELEGRAM_MSG_LIMIT])
+        else:
+            await query.edit_message_text(text)
     elif session.fmt == "pdf":
         pdf_bytes = export_pdf(result.text)
         await query.edit_message_text("Here is your summary:")

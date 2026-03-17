@@ -3,8 +3,6 @@ from dataclasses import dataclass
 from agents import Agent, Runner
 from agents.usage import Usage
 
-from telegram_summarizer.config import load_config
-
 LEVEL_PROMPTS = {
     "min": (
         "You summarize forwarded Telegram messages. "
@@ -33,12 +31,9 @@ class SummaryResult:
     output_tokens: int
 
 
-async def summarize(messages_text: str, level: str) -> SummaryResult:
+async def summarize(messages_text: str, level: str, model: str = "gpt-4.1-nano") -> SummaryResult:
     if level not in LEVEL_PROMPTS:
         raise ValueError(f"Unknown level: {level}. Must be one of: {', '.join(LEVEL_PROMPTS)}")
-
-    config = load_config()
-    model = config.get("openai_model", "gpt-4.1-nano")
 
     agent = Agent(
         name="Summarizer",
