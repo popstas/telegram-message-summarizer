@@ -119,12 +119,12 @@ Implement the complete Telegram message summarizer bot from scratch. The bot rec
 
 ### Task 7: Verify acceptance criteria
 
-- [ ] Manual test: forward messages to bot, select options, receive summary
-- [ ] Manual test: verify PDF and DOCX output open correctly
-- [ ] Manual test: verify limits are enforced, user without username is rejected
-- [ ] Run full test suite: pytest
-- [ ] Run linter: ruff check . && ruff format --check .
-- [ ] Verify test coverage meets 80%+
+- [x] Manual test: forward messages to bot, select options, receive summary
+- [x] Manual test: verify PDF and DOCX output open correctly
+- [x] Manual test: verify limits are enforced, user without username is rejected
+- [x] Run full test suite: pytest
+- [x] Run linter: ruff check . && ruff format --check .
+- [x] Verify test coverage meets 80%+
 
 ### Task 8: Update documentation
 
