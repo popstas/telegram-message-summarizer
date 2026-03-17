@@ -258,36 +258,40 @@ async def _process_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, u
     # Always record usage since tokens were already consumed by the API
     user_manager.record_usage(username, result.input_tokens, result.output_tokens)
 
-    # Export
-    if session.fmt == "markdown":
-        text = result.text
-        if len(text) > TELEGRAM_MSG_LIMIT:
-            await query.edit_message_text(text[:TELEGRAM_MSG_LIMIT])
-            for i in range(TELEGRAM_MSG_LIMIT, len(text), TELEGRAM_MSG_LIMIT):
-                await query.message.reply_text(text[i : i + TELEGRAM_MSG_LIMIT])
-        else:
-            await query.edit_message_text(text)
-    elif session.fmt == "pdf":
-        pdf_bytes = export_pdf(result.text)
-        await query.edit_message_text("Here is your summary:")
-        await query.message.reply_document(
-            document=pdf_bytes,
-            filename="summary.pdf",
-        )
-    elif session.fmt == "docx":
-        docx_bytes = export_docx(result.text)
-        await query.edit_message_text("Here is your summary:")
-        await query.message.reply_document(
-            document=docx_bytes,
-            filename="summary.docx",
-        )
+    # Export and send result
+    try:
+        if session.fmt == "markdown":
+            text = result.text
+            if len(text) > TELEGRAM_MSG_LIMIT:
+                await query.edit_message_text(text[:TELEGRAM_MSG_LIMIT])
+                for i in range(TELEGRAM_MSG_LIMIT, len(text), TELEGRAM_MSG_LIMIT):
+                    await query.message.reply_text(text[i : i + TELEGRAM_MSG_LIMIT])
+            else:
+                await query.edit_message_text(text)
+        elif session.fmt == "pdf":
+            pdf_bytes = export_pdf(result.text)
+            await query.edit_message_text("Here is your summary:")
+            await query.message.reply_document(
+                document=pdf_bytes,
+                filename="summary.pdf",
+            )
+        elif session.fmt == "docx":
+            docx_bytes = export_docx(result.text)
+            await query.edit_message_text("Here is your summary:")
+            await query.message.reply_document(
+                document=docx_bytes,
+                filename="summary.docx",
+            )
 
-    # Send media if requested (only for pdf/docx)
-    if session.save_media and session.fmt != "markdown" and session.media_file_ids:
-        for media in session.media_file_ids:
-            if media["type"] == "photo":
-                await query.message.reply_photo(media["file_id"])
-            elif media["type"] == "document":
-                await query.message.reply_document(media["file_id"])
-
-    clear_session(user_id)
+        # Send media if requested (only for pdf/docx)
+        if session.save_media and session.fmt != "markdown" and session.media_file_ids:
+            for media in session.media_file_ids:
+                if media["type"] == "photo":
+                    await query.message.reply_photo(media["file_id"])
+                elif media["type"] == "document":
+                    await query.message.reply_document(media["file_id"])
+    except Exception as e:
+        logger.error("Export/send failed: %s", e, exc_info=True)
+        await query.edit_message_text("Failed to export summary. Please try a different format.")
+    finally:
+        clear_session(user_id)
