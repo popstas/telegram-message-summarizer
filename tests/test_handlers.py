@@ -417,7 +417,7 @@ class TestCallbackHandler:
         assert new_session.messages == []
 
     @pytest.mark.asyncio
-    async def test_confirm_post_summarization_limit_exceeded(self):
+    async def test_confirm_always_records_usage(self):
         session = get_session(123)
         session.messages = ["test message"]
 
@@ -434,17 +434,13 @@ class TestCallbackHandler:
             patch("telegram_summarizer.handlers.UserManager") as MockUM,
         ):
             mock_um = MockUM.return_value
-            # First check passes (estimated), second check fails (actual usage)
-            mock_um.check_limits.side_effect = [True, False]
+            mock_um.check_limits.return_value = True
             mock_um.record_usage = MagicMock()
 
             await callback_handler(update, context)
 
-        calls = update.callback_query.edit_message_text.call_args_list
-        last_text = calls[-1][0][0]
-        assert "limit" in last_text.lower()
-        # Usage should NOT be recorded
-        mock_um.record_usage.assert_not_called()
+        # Usage is always recorded since API tokens were already consumed
+        mock_um.record_usage.assert_called_once_with("testuser", 50000, 50000)
 
     @pytest.mark.asyncio
     async def test_callback_invalid_level_ignored(self):

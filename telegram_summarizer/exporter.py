@@ -33,7 +33,7 @@ def export_pdf(summary_text: str) -> bytes:
     for line in summary_text.split("\n"):
         if re.match(r"^#{1,3}\s", line):
             pdf.set_font(font_family, "B", size=14)
-            pdf.multi_cell(w, 8, line.lstrip("# ").strip())
+            pdf.multi_cell(w, 8, re.sub(r"^#{1,3}\s+", "", line).strip())
             pdf.set_font(font_family, size=11)
         elif line.strip() == "":
             pdf.ln(4)
@@ -49,7 +49,7 @@ def export_docx(summary_text: str) -> bytes:
     for line in summary_text.split("\n"):
         if re.match(r"^#{1,3}\s", line):
             level = len(line) - len(line.lstrip("#"))
-            doc.add_heading(line.lstrip("# ").strip(), level=min(level, 9))
+            doc.add_heading(re.sub(r"^#{1,3}\s+", "", line).strip(), level=min(level, 9))
         elif line.strip() == "":
             continue
         else:

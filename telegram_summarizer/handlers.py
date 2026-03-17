@@ -239,13 +239,7 @@ async def _process_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, u
         clear_session(user_id)
         return
 
-    # Check limits with actual usage
-    if not user_manager.check_limits(username, result.input_tokens, result.output_tokens, config):
-        await query.edit_message_text("Token limit would be exceeded. Try a shorter message or lower level.")
-        clear_session(user_id)
-        return
-
-    # Record usage
+    # Always record usage since tokens were already consumed by the API
     user_manager.record_usage(username, result.input_tokens, result.output_tokens)
 
     # Export
