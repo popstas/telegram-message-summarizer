@@ -112,10 +112,10 @@ Implement the complete Telegram message summarizer bot from scratch. The bot rec
 - Create: `Dockerfile`
 - Create: `docker-compose.yml`
 
-- [ ] Create Dockerfile: Python slim base, install deps, copy code, run with python -m telegram_summarizer
-- [ ] Create docker-compose.yml: single service, mount `./data` volume for config and SQLite db
-- [ ] Test docker-compose build succeeds
-- [ ] Run pytest - must pass before task 7
+- [x] Create Dockerfile: Python slim base, install deps, copy code, run with python -m telegram_summarizer
+- [x] Create docker-compose.yml: single service, mount `./data` volume for config and SQLite db
+- [x] Test docker-compose build succeeds
+- [x] Run pytest - must pass before task 7
 
 ### Task 7: Verify acceptance criteria
 
