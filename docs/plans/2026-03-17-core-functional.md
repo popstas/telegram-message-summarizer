@@ -67,12 +67,12 @@ Implement the complete Telegram message summarizer bot from scratch. The bot rec
 - Create: `telegram_summarizer/summarizer.py`
 - Create: `tests/test_summarizer.py`
 
-- [ ] Implement summarize(messages_text, level) using OpenAI Agents SDK
-- [ ] Define three processing levels: min (mostly quotes, minimal rewrite), mid (balanced summary), max (heavy condensation)
-- [ ] Build appropriate system prompts for each level
-- [ ] Return summary text and token usage (input + output counts)
-- [ ] Write tests with mocked OpenAI calls: verify correct prompts per level, token counting
-- [ ] Run pytest - must pass before task 4
+- [x] Implement summarize(messages_text, level) using OpenAI Agents SDK
+- [x] Define three processing levels: min (mostly quotes, minimal rewrite), mid (balanced summary), max (heavy condensation)
+- [x] Build appropriate system prompts for each level
+- [x] Return summary text and token usage (input + output counts)
+- [x] Write tests with mocked OpenAI calls: verify correct prompts per level, token counting
+- [x] Run pytest - must pass before task 4
 
 ### Task 4: Exporter (markdown, PDF, DOCX)
 
