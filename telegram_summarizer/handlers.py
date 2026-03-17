@@ -156,7 +156,10 @@ def _build_form_text(session: UserSession) -> str:
 
 
 async def _show_form_after_timeout(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int) -> None:
-    await asyncio.sleep(BATCH_TIMEOUT_SECONDS)
+    try:
+        await asyncio.sleep(BATCH_TIMEOUT_SECONDS)
+    except asyncio.CancelledError:
+        return
     session = get_session(user_id)
     if not session.messages:
         return
@@ -200,16 +203,19 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await _process_summary(update, context, user_id)
         return
 
-    if data.startswith("level:"):
-        value = data.split(":")[1]
+    parts = data.split(":", 1)
+    if len(parts) != 2:
+        return
+
+    prefix, value = parts
+    if prefix == "level":
         if value in LEVEL_PROMPTS:
             session.level = value
-    elif data.startswith("fmt:"):
-        value = data.split(":")[1]
+    elif prefix == "fmt":
         if value in VALID_FORMATS:
             session.fmt = value
-    elif data.startswith("media:"):
-        session.save_media = data.split(":")[1] == "yes"
+    elif prefix == "media":
+        session.save_media = value == "yes"
 
     keyboard = build_form_keyboard(session)
     await query.edit_message_reply_markup(reply_markup=keyboard)
@@ -228,7 +234,8 @@ async def _process_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, u
     user_manager = context.bot_data["user_manager"]
     combined_text = "\n\n---\n\n".join(session.messages)
     estimated_input = len(combined_text) // 4
-    if not user_manager.check_limits(username, estimated_input, 0, config):
+    estimated_output = estimated_input  # conservative estimate for output budget
+    if not user_manager.check_limits(username, estimated_input, estimated_output, config):
         await query.edit_message_text("Daily token limit exceeded. Try again tomorrow.")
         clear_session(user_id)
         return
