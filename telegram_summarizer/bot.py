@@ -16,6 +16,7 @@ from telegram_summarizer.handlers import (
     start_handler,
     stats_handler,
 )
+from telegram_summarizer.user_manager import UserManager
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,7 @@ def create_application(config: dict | None = None) -> Application:
 
     app = Application.builder().token(config["bot_token"]).build()
     app.bot_data["config"] = config
+    app.bot_data["user_manager"] = UserManager()
 
     app.add_handler(CommandHandler("start", start_handler))
     app.add_handler(CommandHandler("stats", stats_handler))
@@ -36,8 +38,9 @@ def create_application(config: dict | None = None) -> Application:
     return app
 
 
-def run_bot() -> None:
-    config = load_config()
+def run_bot(config: dict | None = None) -> None:
+    if config is None:
+        config = load_config()
     if not config["bot_token"]:
         logger.error("bot_token not set in data/config.yml")
         return

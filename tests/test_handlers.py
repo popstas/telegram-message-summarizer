@@ -39,7 +39,7 @@ def make_update(user_id=123, username="testuser", text="hello", is_forwarded=Tru
     return update
 
 
-def make_context(config=None):
+def make_context(config=None, user_manager=None):
     context = MagicMock()
     context.bot_data = {
         "config": config
@@ -49,7 +49,8 @@ def make_context(config=None):
             "openai_model": "gpt-4.1-nano",
             "default_limits": {"input_tokens": 10000, "output_tokens": 10000},
             "users": {},
-        }
+        },
+        "user_manager": user_manager or MagicMock(),
     }
     return context
 
@@ -154,18 +155,17 @@ class TestStatsHandler:
     @pytest.mark.asyncio
     async def test_with_username(self):
         update = make_update(username="testuser")
-        context = make_context()
-        with patch("telegram_summarizer.handlers.UserManager") as MockUM:
-            mock_um = MockUM.return_value
-            mock_um.get_stats.return_value = {
-                "username": "testuser",
-                "input_tokens_today": 100,
-                "output_tokens_today": 50,
-                "input_tokens_total": 500,
-                "output_tokens_total": 250,
-                "last_reset_date": "2026-03-17",
-            }
-            await stats_handler(update, context)
+        mock_um = MagicMock()
+        mock_um.get_stats.return_value = {
+            "username": "testuser",
+            "input_tokens_today": 100,
+            "output_tokens_today": 50,
+            "input_tokens_total": 500,
+            "output_tokens_total": 250,
+            "last_reset_date": "2026-03-17",
+        }
+        context = make_context(user_manager=mock_um)
+        await stats_handler(update, context)
         call_text = update.message.reply_text.call_args[0][0]
         assert "100" in call_text
         assert "50" in call_text
@@ -309,21 +309,16 @@ class TestCallbackHandler:
         session.messages = ["test message"]
 
         update = self._make_callback_update("confirm")
-        context = make_context()
+        mock_um = MagicMock()
+        mock_um.check_limits.return_value = True
+        context = make_context(user_manager=mock_um)
 
         mock_result = MagicMock()
         mock_result.text = "Summary text"
         mock_result.input_tokens = 10
         mock_result.output_tokens = 5
 
-        with (
-            patch("telegram_summarizer.handlers.summarize", new_callable=AsyncMock, return_value=mock_result),
-            patch("telegram_summarizer.handlers.UserManager") as MockUM,
-        ):
-            mock_um = MockUM.return_value
-            mock_um.check_limits.return_value = True
-            mock_um.record_usage = MagicMock()
-
+        with patch("telegram_summarizer.handlers.summarize", new_callable=AsyncMock, return_value=mock_result):
             await callback_handler(update, context)
 
         # Status message edited with result
@@ -337,21 +332,16 @@ class TestCallbackHandler:
         session.fmt = "pdf"
 
         update = self._make_callback_update("confirm")
-        context = make_context()
+        mock_um = MagicMock()
+        mock_um.check_limits.return_value = True
+        context = make_context(user_manager=mock_um)
 
         mock_result = MagicMock()
         mock_result.text = "Summary text"
         mock_result.input_tokens = 10
         mock_result.output_tokens = 5
 
-        with (
-            patch("telegram_summarizer.handlers.summarize", new_callable=AsyncMock, return_value=mock_result),
-            patch("telegram_summarizer.handlers.UserManager") as MockUM,
-        ):
-            mock_um = MockUM.return_value
-            mock_um.check_limits.return_value = True
-            mock_um.record_usage = MagicMock()
-
+        with patch("telegram_summarizer.handlers.summarize", new_callable=AsyncMock, return_value=mock_result):
             await callback_handler(update, context)
 
         update.callback_query.message.reply_document.assert_called_once()
@@ -365,21 +355,16 @@ class TestCallbackHandler:
         session.fmt = "docx"
 
         update = self._make_callback_update("confirm")
-        context = make_context()
+        mock_um = MagicMock()
+        mock_um.check_limits.return_value = True
+        context = make_context(user_manager=mock_um)
 
         mock_result = MagicMock()
         mock_result.text = "Summary text"
         mock_result.input_tokens = 10
         mock_result.output_tokens = 5
 
-        with (
-            patch("telegram_summarizer.handlers.summarize", new_callable=AsyncMock, return_value=mock_result),
-            patch("telegram_summarizer.handlers.UserManager") as MockUM,
-        ):
-            mock_um = MockUM.return_value
-            mock_um.check_limits.return_value = True
-            mock_um.record_usage = MagicMock()
-
+        with patch("telegram_summarizer.handlers.summarize", new_callable=AsyncMock, return_value=mock_result):
             await callback_handler(update, context)
 
         update.callback_query.message.reply_document.assert_called_once()
@@ -392,19 +377,15 @@ class TestCallbackHandler:
         session.messages = ["test message"]
 
         update = self._make_callback_update("confirm")
-        context = make_context()
+        mock_um = MagicMock()
+        mock_um.check_limits.return_value = True
+        context = make_context(user_manager=mock_um)
 
-        with (
-            patch(
-                "telegram_summarizer.handlers.summarize",
-                new_callable=AsyncMock,
-                side_effect=RuntimeError("API connection failed"),
-            ),
-            patch("telegram_summarizer.handlers.UserManager") as MockUM,
+        with patch(
+            "telegram_summarizer.handlers.summarize",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("API connection failed"),
         ):
-            mock_um = MockUM.return_value
-            mock_um.check_limits.return_value = True
-
             await callback_handler(update, context)
 
         calls = update.callback_query.edit_message_text.call_args_list
@@ -422,21 +403,16 @@ class TestCallbackHandler:
         session.messages = ["test message"]
 
         update = self._make_callback_update("confirm")
-        context = make_context()
+        mock_um = MagicMock()
+        mock_um.check_limits.return_value = True
+        context = make_context(user_manager=mock_um)
 
         mock_result = MagicMock()
         mock_result.text = "Summary text"
         mock_result.input_tokens = 50000
         mock_result.output_tokens = 50000
 
-        with (
-            patch("telegram_summarizer.handlers.summarize", new_callable=AsyncMock, return_value=mock_result),
-            patch("telegram_summarizer.handlers.UserManager") as MockUM,
-        ):
-            mock_um = MockUM.return_value
-            mock_um.check_limits.return_value = True
-            mock_um.record_usage = MagicMock()
-
+        with patch("telegram_summarizer.handlers.summarize", new_callable=AsyncMock, return_value=mock_result):
             await callback_handler(update, context)
 
         # Usage is always recorded since API tokens were already consumed
@@ -466,13 +442,11 @@ class TestCallbackHandler:
         session.messages = ["test message"]
 
         update = self._make_callback_update("confirm")
-        context = make_context()
+        mock_um = MagicMock()
+        mock_um.check_limits.return_value = False
+        context = make_context(user_manager=mock_um)
 
-        with patch("telegram_summarizer.handlers.UserManager") as MockUM:
-            mock_um = MockUM.return_value
-            mock_um.check_limits.return_value = False
-
-            await callback_handler(update, context)
+        await callback_handler(update, context)
 
         # Last call should contain the limit message
         calls = update.callback_query.edit_message_text.call_args_list
@@ -491,21 +465,16 @@ class TestCallbackHandler:
         ]
 
         update = self._make_callback_update("confirm")
-        context = make_context()
+        mock_um = MagicMock()
+        mock_um.check_limits.return_value = True
+        context = make_context(user_manager=mock_um)
 
         mock_result = MagicMock()
         mock_result.text = "Summary text"
         mock_result.input_tokens = 10
         mock_result.output_tokens = 5
 
-        with (
-            patch("telegram_summarizer.handlers.summarize", new_callable=AsyncMock, return_value=mock_result),
-            patch("telegram_summarizer.handlers.UserManager") as MockUM,
-        ):
-            mock_um = MockUM.return_value
-            mock_um.check_limits.return_value = True
-            mock_um.record_usage = MagicMock()
-
+        with patch("telegram_summarizer.handlers.summarize", new_callable=AsyncMock, return_value=mock_result):
             await callback_handler(update, context)
 
         update.callback_query.message.reply_photo.assert_called_once_with("photo123")
@@ -520,21 +489,16 @@ class TestCallbackHandler:
         session.media_file_ids = [{"type": "photo", "file_id": "photo123"}]
 
         update = self._make_callback_update("confirm")
-        context = make_context()
+        mock_um = MagicMock()
+        mock_um.check_limits.return_value = True
+        context = make_context(user_manager=mock_um)
 
         mock_result = MagicMock()
         mock_result.text = "Summary text"
         mock_result.input_tokens = 10
         mock_result.output_tokens = 5
 
-        with (
-            patch("telegram_summarizer.handlers.summarize", new_callable=AsyncMock, return_value=mock_result),
-            patch("telegram_summarizer.handlers.UserManager") as MockUM,
-        ):
-            mock_um = MockUM.return_value
-            mock_um.check_limits.return_value = True
-            mock_um.record_usage = MagicMock()
-
+        with patch("telegram_summarizer.handlers.summarize", new_callable=AsyncMock, return_value=mock_result):
             await callback_handler(update, context)
 
         # Photo should NOT be sent for markdown
@@ -546,23 +510,19 @@ class TestCallbackHandler:
         session.messages = ["test message"]
 
         update = self._make_callback_update("confirm")
-        context = make_context()
+        mock_um = MagicMock()
+        mock_um.check_limits.return_value = True
+        context = make_context(user_manager=mock_um)
 
         mock_result = MagicMock()
         mock_result.text = "Summary text"
         mock_result.input_tokens = 100
         mock_result.output_tokens = 50
 
-        with (
-            patch("telegram_summarizer.handlers.summarize", new_callable=AsyncMock, return_value=mock_result),
-            patch("telegram_summarizer.handlers.UserManager") as MockUM,
-        ):
-            mock_um = MockUM.return_value
-            mock_um.check_limits.return_value = True
-
+        with patch("telegram_summarizer.handlers.summarize", new_callable=AsyncMock, return_value=mock_result):
             await callback_handler(update, context)
 
-            mock_um.record_usage.assert_called_once_with("testuser", 100, 50)
+        mock_um.record_usage.assert_called_once_with("testuser", 100, 50)
 
     @pytest.mark.asyncio
     async def test_session_cleared_after_confirm(self):
@@ -570,21 +530,16 @@ class TestCallbackHandler:
         session.messages = ["test message"]
 
         update = self._make_callback_update("confirm")
-        context = make_context()
+        mock_um = MagicMock()
+        mock_um.check_limits.return_value = True
+        context = make_context(user_manager=mock_um)
 
         mock_result = MagicMock()
         mock_result.text = "Summary text"
         mock_result.input_tokens = 10
         mock_result.output_tokens = 5
 
-        with (
-            patch("telegram_summarizer.handlers.summarize", new_callable=AsyncMock, return_value=mock_result),
-            patch("telegram_summarizer.handlers.UserManager") as MockUM,
-        ):
-            mock_um = MockUM.return_value
-            mock_um.check_limits.return_value = True
-            mock_um.record_usage = MagicMock()
-
+        with patch("telegram_summarizer.handlers.summarize", new_callable=AsyncMock, return_value=mock_result):
             await callback_handler(update, context)
 
         # Session should be cleared

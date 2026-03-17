@@ -8,7 +8,7 @@ from telegram.ext import ContextTypes
 from telegram_summarizer.config import get_user_limits
 from telegram_summarizer.exporter import export_docx, export_pdf
 from telegram_summarizer.summarizer import LEVEL_PROMPTS, summarize
-from telegram_summarizer.user_manager import NoUsernameError, UserManager
+from telegram_summarizer.user_manager import NoUsernameError
 
 VALID_FORMATS = {"markdown", "pdf", "docx"}
 TELEGRAM_MSG_LIMIT = 4096
@@ -91,7 +91,7 @@ async def stats_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     config = context.bot_data["config"]
-    user_manager = UserManager()
+    user_manager = context.bot_data["user_manager"]
     try:
         stats = user_manager.get_stats(username)
     except NoUsernameError:
@@ -225,7 +225,7 @@ async def _process_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, u
     await query.edit_message_text("Processing your messages...")
 
     # Check limits with estimated input tokens
-    user_manager = UserManager()
+    user_manager = context.bot_data["user_manager"]
     combined_text = "\n\n---\n\n".join(session.messages)
     estimated_input = len(combined_text) // 4
     if not user_manager.check_limits(username, estimated_input, 0, config):

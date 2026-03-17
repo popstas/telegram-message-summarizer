@@ -9,7 +9,7 @@ def main() -> None:
     config = load_config()
     if config.get("openai_api_key") and not os.environ.get("OPENAI_API_KEY"):
         os.environ["OPENAI_API_KEY"] = config["openai_api_key"]
-    run_bot()
+    run_bot(config)
 
 
 if __name__ == "__main__":

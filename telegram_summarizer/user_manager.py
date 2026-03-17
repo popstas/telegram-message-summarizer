@@ -9,10 +9,6 @@ class NoUsernameError(Exception):
     pass
 
 
-class LimitExceededError(Exception):
-    pass
-
-
 class UserManager:
     def __init__(self, db_path: Path | None = None):
         if db_path is None:
