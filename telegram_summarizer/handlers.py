@@ -39,7 +39,9 @@ def get_session(user_id: int) -> UserSession:
 
 
 def clear_session(user_id: int) -> None:
-    _sessions.pop(user_id, None)
+    session = _sessions.pop(user_id, None)
+    if session and session.batch_task and not session.batch_task.done():
+        session.batch_task.cancel()
 
 
 def build_form_keyboard(session: UserSession) -> InlineKeyboardMarkup:

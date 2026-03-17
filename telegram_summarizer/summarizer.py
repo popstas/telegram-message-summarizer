@@ -45,7 +45,8 @@ async def summarize(messages_text: str, level: str, model: str = "gpt-4.1-nano")
 
     total_usage = Usage()
     for response in result.raw_responses:
-        total_usage.add(response.usage)
+        if response.usage:
+            total_usage.add(response.usage)
 
     return SummaryResult(
         text=result.final_output,
