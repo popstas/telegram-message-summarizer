@@ -1,3 +1,4 @@
+import copy
 import os
 from pathlib import Path
 
@@ -31,7 +32,7 @@ def _deep_merge(base: dict, override: dict) -> dict:
 def load_config(path: Path | None = None) -> dict:
     if path is None:
         path = CONFIG_PATH
-    config = DEFAULT_CONFIG.copy()
+    config = copy.deepcopy(DEFAULT_CONFIG)
     if path.exists():
         with open(path) as f:
             file_config = yaml.safe_load(f) or {}
