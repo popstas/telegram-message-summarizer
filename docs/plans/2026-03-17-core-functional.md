@@ -80,11 +80,11 @@ Implement the complete Telegram message summarizer bot from scratch. The bot rec
 - Create: `telegram_summarizer/exporter.py`
 - Create: `tests/test_exporter.py`
 
-- [ ] Implement export_markdown(summary_text) - returns text as-is
-- [ ] Implement export_pdf(summary_text) - generate PDF using fpdf2 or reportlab, return bytes
-- [ ] Implement export_docx(summary_text) - generate DOCX using python-docx, return bytes
-- [ ] Write tests: each format produces valid output, handles unicode/long text
-- [ ] Run pytest - must pass before task 5
+- [x] Implement export_markdown(summary_text) - returns text as-is
+- [x] Implement export_pdf(summary_text) - generate PDF using fpdf2 or reportlab, return bytes
+- [x] Implement export_docx(summary_text) - generate DOCX using python-docx, return bytes
+- [x] Write tests: each format produces valid output, handles unicode/long text
+- [x] Run pytest - must pass before task 5
 
 ### Task 5: Telegram bot handler with interactive form
 
