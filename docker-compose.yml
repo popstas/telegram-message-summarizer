@@ -1,0 +1,6 @@
+services:
+  bot:
+    build: .
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

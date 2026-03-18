@@ -1,0 +1,16 @@
+[project]
+name = "telegram-message-summarizer"
+version = "0.1.0"
+description = "Telegram bot for summarizing forwarded messages"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

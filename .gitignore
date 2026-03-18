@@ -1,3 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+
+data/config.yml
+data/*.db
 
 # ralphex progress logs
 .ralphex/progress/
+.coverage

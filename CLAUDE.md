@@ -9,11 +9,11 @@ Telegram bot for summarizing forwarded messages. Users forward a batch of messag
 ## Tech Stack
 
 - **Language**: Python (use `.venv` for virtual environment)
-- **Bot framework**: python-telegram-bot or aiogram
-- **LLM**: OpenAI API (gpt-5-nano or similar minimal model) via official OpenAI Agent SDK
-- **Config**: YAML
-- **Storage**: SQLite or JSON for user limits/statistics
-- **Export**: lightweight libraries for PDF and DOCX (no LibreOffice)
+- **Bot framework**: python-telegram-bot
+- **LLM**: OpenAI API via official OpenAI Agents SDK (openai-agents)
+- **Config**: YAML (pyyaml)
+- **Storage**: SQLite for user limits/statistics (`data/users.db`)
+- **Export**: fpdf2 for PDF, python-docx for DOCX
 - **Deployment**: Docker Compose
 
 ## Commands
