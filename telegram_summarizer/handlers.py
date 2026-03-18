@@ -207,8 +207,13 @@ async def reprocess_command_handler(update: Update, context: ContextTypes.DEFAUL
 
     data = _last_processed[user_id]
     session = get_session(user_id)
+
+    # Cancel any pending batch timer
+    if session.batch_task and not session.batch_task.done():
+        session.batch_task.cancel()
+
     session.messages = list(data["messages"])
-    session.media_file_ids = list(data["media_file_ids"])
+    session.media_file_ids = [dict(m) for m in data["media_file_ids"]]
     session.level = data["level"]
     session.fmt = data["fmt"]
     session.save_media = data["save_media"]
@@ -340,7 +345,7 @@ async def _process_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, u
         # Save session data for /reprocess before clearing
         _last_processed[user_id] = {
             "messages": list(session.messages),
-            "media_file_ids": list(session.media_file_ids),
+            "media_file_ids": [dict(m) for m in session.media_file_ids],
             "level": session.level,
             "fmt": session.fmt,
             "save_media": session.save_media,

@@ -79,12 +79,16 @@ users:
 - `/start` - welcome message
 - `/stats` - show your token usage statistics
 - `/process` - manually trigger processing of collected messages
+- `/reprocess` - re-summarize last processed messages with new settings
 
 ## Development
 
 ```bash
 # Run tests
 pytest
+
+# Run end-to-end tests (requires test_bot_token in config + Telegram API credentials)
+TELEGRAM_API_ID=... TELEGRAM_API_HASH=... pytest -m e2e
 
 # Lint and format check
 ruff check .

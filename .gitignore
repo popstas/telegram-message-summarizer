@@ -2,9 +2,10 @@ __pycache__/
 *.pyc
 .venv/
 
-data/
+data/*
 !data/config.example.yml
 
 # ralphex progress logs
 .ralphex/progress/
 .coverage
+telegram_message_summarizer.egg-info

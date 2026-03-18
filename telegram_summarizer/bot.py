@@ -50,7 +50,10 @@ async def _set_bot_commands(application: Application) -> None:
         BotCommand("reprocess", "Re-summarize last processed messages"),
         BotCommand("stats", "Show usage statistics"),
     ]
-    await application.bot.set_my_commands(commands)
+    try:
+        await application.bot.set_my_commands(commands)
+    except Exception:
+        logger.warning("Failed to set bot commands menu", exc_info=True)
 
 
 def run_bot(config: dict | None = None) -> None:
