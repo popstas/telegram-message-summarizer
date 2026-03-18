@@ -1,5 +1,6 @@
 import logging
 
+from telegram import BotCommand
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -13,6 +14,7 @@ from telegram_summarizer.handlers import (
     callback_handler,
     forwarded_message_handler,
     process_command_handler,
+    reprocess_command_handler,
     start_handler,
     stats_handler,
 )
@@ -32,10 +34,23 @@ def create_application(config: dict | None = None) -> Application:
     app.add_handler(CommandHandler("start", start_handler))
     app.add_handler(CommandHandler("stats", stats_handler))
     app.add_handler(CommandHandler("process", process_command_handler))
+    app.add_handler(CommandHandler("reprocess", reprocess_command_handler))
     app.add_handler(CallbackQueryHandler(callback_handler))
     app.add_handler(MessageHandler(filters.FORWARDED & (~filters.COMMAND), forwarded_message_handler))
 
+    app.post_init = _set_bot_commands
+
     return app
+
+
+async def _set_bot_commands(application: Application) -> None:
+    commands = [
+        BotCommand("start", "Start the bot"),
+        BotCommand("process", "Process forwarded messages"),
+        BotCommand("reprocess", "Re-summarize last processed messages"),
+        BotCommand("stats", "Show usage statistics"),
+    ]
+    await application.bot.set_my_commands(commands)
 
 
 def run_bot(config: dict | None = None) -> None:

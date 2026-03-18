@@ -4,6 +4,7 @@ import pytest
 
 from telegram_summarizer.handlers import (
     UserSession,
+    _last_processed,
     _sessions,
     build_form_keyboard,
     callback_handler,
@@ -11,6 +12,7 @@ from telegram_summarizer.handlers import (
     forwarded_message_handler,
     get_session,
     process_command_handler,
+    reprocess_command_handler,
     start_handler,
     stats_handler,
 )
@@ -19,8 +21,10 @@ from telegram_summarizer.handlers import (
 @pytest.fixture(autouse=True)
 def clear_all_sessions():
     _sessions.clear()
+    _last_processed.clear()
     yield
     _sessions.clear()
+    _last_processed.clear()
 
 
 def make_update(user_id=123, username="testuser", text="hello", is_forwarded=True):
@@ -608,3 +612,83 @@ class TestCallbackHandler:
         # Session should be cleared
         new_session = get_session(123)
         assert new_session.messages == []
+
+
+class TestReprocessCommandHandler:
+    @pytest.mark.asyncio
+    async def test_no_previous_data(self):
+        update = make_update()
+        context = make_context()
+        await reprocess_command_handler(update, context)
+        call_text = update.message.reply_text.call_args[0][0]
+        assert "No previous messages" in call_text
+
+    @pytest.mark.asyncio
+    async def test_no_username(self):
+        update = make_update(username=None)
+        context = make_context()
+        await reprocess_command_handler(update, context)
+        call_text = update.message.reply_text.call_args[0][0]
+        assert "username" in call_text.lower()
+
+    @pytest.mark.asyncio
+    async def test_restores_session_and_shows_form(self):
+        _last_processed[123] = {
+            "messages": ["msg1", "msg2"],
+            "media_file_ids": [{"type": "photo", "file_id": "p1"}],
+            "level": "max",
+            "fmt": "pdf",
+            "save_media": True,
+        }
+        update = make_update()
+        context = make_context()
+        await reprocess_command_handler(update, context)
+
+        call_text = update.message.reply_text.call_args[0][0]
+        assert "2 message" in call_text
+        assert update.message.reply_text.call_args[1]["reply_markup"] is not None
+
+        session = get_session(123)
+        assert session.messages == ["msg1", "msg2"]
+        assert session.level == "max"
+        assert session.fmt == "pdf"
+        assert session.save_media is True
+        assert len(session.media_file_ids) == 1
+
+    @pytest.mark.asyncio
+    async def test_last_processed_saved_after_confirm(self):
+        session = get_session(123)
+        session.messages = ["test message"]
+        session.level = "min"
+        session.fmt = "docx"
+        session.save_media = True
+        session.media_file_ids = [{"type": "photo", "file_id": "p1"}]
+
+        update = MagicMock()
+        update.effective_user.id = 123
+        update.effective_user.username = "testuser"
+        update.callback_query.data = "confirm"
+        update.callback_query.answer = AsyncMock()
+        update.callback_query.edit_message_reply_markup = AsyncMock()
+        update.callback_query.edit_message_text = AsyncMock()
+        update.callback_query.message.reply_text = AsyncMock()
+        update.callback_query.message.reply_document = AsyncMock()
+        update.callback_query.message.reply_photo = AsyncMock()
+
+        mock_um = MagicMock()
+        mock_um.check_limits.return_value = True
+        context = make_context(user_manager=mock_um)
+
+        mock_result = MagicMock()
+        mock_result.text = "Summary"
+        mock_result.input_tokens = 10
+        mock_result.output_tokens = 5
+
+        with patch("telegram_summarizer.handlers.summarize", new_callable=AsyncMock, return_value=mock_result):
+            await callback_handler(update, context)
+
+        assert 123 in _last_processed
+        assert _last_processed[123]["messages"] == ["test message"]
+        assert _last_processed[123]["level"] == "min"
+        assert _last_processed[123]["fmt"] == "docx"
+        assert _last_processed[123]["save_media"] is True

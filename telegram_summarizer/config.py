@@ -16,6 +16,7 @@ DEFAULT_CONFIG = {
         "output_tokens": 10000,
     },
     "users": {},
+    "test_bot_token": "",
 }
 
 

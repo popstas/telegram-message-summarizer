@@ -9,6 +9,9 @@ default_limits:
   input_tokens: 10000
   output_tokens: 10000
 
+# Bot token for end-to-end tests (optional, leave empty to skip e2e tests)
+test_bot_token: ""
+
 # Per-user overrides (by Telegram username, without @)
 users:
   example_user:

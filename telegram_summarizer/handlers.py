@@ -31,6 +31,9 @@ class UserSession:
 # Per-user sessions keyed by user_id
 _sessions: dict[int, UserSession] = {}
 
+# Per-user last processed data for /reprocess
+_last_processed: dict[int, dict] = {}
+
 
 def get_session(user_id: int) -> UserSession:
     if user_id not in _sessions:
@@ -191,6 +194,30 @@ async def process_command_handler(update: Update, context: ContextTypes.DEFAULT_
     await update.message.reply_text(text, reply_markup=keyboard)
 
 
+async def reprocess_command_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    username = update.effective_user.username
+    if not username:
+        await update.message.reply_text("You need a Telegram username to use this bot.")
+        return
+
+    user_id = update.effective_user.id
+    if user_id not in _last_processed:
+        await update.message.reply_text("No previous messages to reprocess.")
+        return
+
+    data = _last_processed[user_id]
+    session = get_session(user_id)
+    session.messages = list(data["messages"])
+    session.media_file_ids = list(data["media_file_ids"])
+    session.level = data["level"]
+    session.fmt = data["fmt"]
+    session.save_media = data["save_media"]
+
+    text = _build_form_text(session)
+    keyboard = build_form_keyboard(session)
+    await update.message.reply_text(text, reply_markup=keyboard)
+
+
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
@@ -310,4 +337,12 @@ async def _process_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, u
         logger.error("Export/send failed: %s", e, exc_info=True)
         await query.edit_message_text("Failed to export summary. Please try a different format.")
     finally:
+        # Save session data for /reprocess before clearing
+        _last_processed[user_id] = {
+            "messages": list(session.messages),
+            "media_file_ids": list(session.media_file_ids),
+            "level": session.level,
+            "fmt": session.fmt,
+            "save_media": session.save_media,
+        }
         clear_session(user_id)
