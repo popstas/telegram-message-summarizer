@@ -525,6 +525,69 @@ class TestCallbackHandler:
         mock_um.record_usage.assert_called_once_with("testuser", 100, 50)
 
     @pytest.mark.asyncio
+    async def test_confirm_logs_summary_line(self, caplog):
+        session = get_session(123)
+        session.messages = ["msg1", "msg2", "msg3"]
+        session.media_file_ids = [{"type": "photo", "file_id": "p1"}]
+        session.level = "max"
+        session.fmt = "pdf"
+        session.save_media = True
+
+        update = self._make_callback_update("confirm")
+        mock_um = MagicMock()
+        mock_um.check_limits.return_value = True
+        context = make_context(user_manager=mock_um)
+
+        mock_result = MagicMock()
+        mock_result.text = "Summary text"
+        mock_result.input_tokens = 1234
+        mock_result.output_tokens = 567
+
+        with patch("telegram_summarizer.handlers.summarize", new_callable=AsyncMock, return_value=mock_result):
+            import logging
+
+            with caplog.at_level(logging.INFO, logger="telegram_summarizer.handlers"):
+                await callback_handler(update, context)
+
+        log_line = [r for r in caplog.records if "Summary completed" in r.message]
+        assert len(log_line) == 1
+        msg = log_line[0].message
+        assert "user=@testuser" in msg
+        assert "messages=3" in msg
+        assert "media=1" in msg
+        assert "level=max" in msg
+        assert "format=pdf" in msg
+        assert "save_media=True" in msg
+        assert "input_tokens=1234" in msg
+        assert "output_tokens=567" in msg
+
+    @pytest.mark.asyncio
+    async def test_confirm_no_summary_log_on_error(self, caplog):
+        session = get_session(123)
+        session.messages = ["msg1"]
+        session.level = "min"
+        session.fmt = "markdown"
+        session.save_media = False
+
+        update = self._make_callback_update("confirm")
+        mock_um = MagicMock()
+        mock_um.check_limits.return_value = True
+        context = make_context(user_manager=mock_um)
+
+        with patch(
+            "telegram_summarizer.handlers.summarize",
+            new_callable=AsyncMock,
+            side_effect=Exception("API error"),
+        ):
+            import logging
+
+            with caplog.at_level(logging.INFO, logger="telegram_summarizer.handlers"):
+                await callback_handler(update, context)
+
+        log_line = [r for r in caplog.records if "Summary completed" in r.message]
+        assert len(log_line) == 0
+
+    @pytest.mark.asyncio
     async def test_session_cleared_after_confirm(self):
         session = get_session(123)
         session.messages = ["test message"]

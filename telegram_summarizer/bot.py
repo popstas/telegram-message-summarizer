@@ -49,6 +49,7 @@ def run_bot(config: dict | None = None) -> None:
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         level=logging.INFO,
     )
+    logging.getLogger("httpx").setLevel(logging.WARNING)
 
     app = create_application(config)
     logger.info("Bot starting...")

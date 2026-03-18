@@ -195,6 +195,11 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     query = update.callback_query
     await query.answer()
 
+    username = update.effective_user.username
+    if not username:
+        await query.edit_message_text("You need a Telegram username to use this bot.")
+        return
+
     user_id = update.effective_user.id
     session = get_session(user_id)
     data = query.data
@@ -231,9 +236,7 @@ async def _process_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, u
     await query.edit_message_text("Processing your messages...")
 
     if not session.messages:
-        await query.edit_message_text(
-            "No text messages to summarize. Only media files were forwarded."
-        )
+        await query.edit_message_text("No text messages to summarize. Only media files were forwarded.")
         clear_session(user_id)
         return
 
@@ -257,6 +260,19 @@ async def _process_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, u
 
     # Always record usage since tokens were already consumed by the API
     user_manager.record_usage(username, result.input_tokens, result.output_tokens)
+
+    logger.info(
+        "Summary completed: user=@%s messages=%d media=%d level=%s format=%s"
+        " save_media=%s input_tokens=%d output_tokens=%d",
+        username,
+        len(session.messages),
+        len(session.media_file_ids),
+        session.level,
+        session.fmt,
+        session.save_media,
+        result.input_tokens,
+        result.output_tokens,
+    )
 
     # Export and send result
     try:
