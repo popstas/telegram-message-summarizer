@@ -3,6 +3,24 @@ from dataclasses import dataclass
 from agents import Agent, Runner
 from agents.usage import Usage
 
+STYLE_PROMPTS = {
+    "original": (
+        "Keep the text close to original wording. Clean up chat artifacts "
+        "(filler words, informal abbreviations, repeated greetings) but preserve "
+        "the author's voice and structure. Output as a single cohesive document."
+    ),
+    "instruction": (
+        "Rewrite as a clear, structured instructional document. Remove all chat-like "
+        "language, filler words, greetings, and informal phrases. Use imperative or "
+        "declarative tone. Output as a single cohesive document with logical sections."
+    ),
+    "blog": (
+        "Rewrite as an engaging blog post. Remove chat artifacts and informal filler. "
+        "Use a natural, readable narrative style with smooth transitions. "
+        "Output as a single cohesive document."
+    ),
+}
+
 LEVEL_PROMPTS = {
     "min": (
         "You summarize forwarded Telegram messages. "
@@ -31,13 +49,19 @@ class SummaryResult:
     output_tokens: int
 
 
-async def summarize(messages_text: str, level: str, model: str = "gpt-4.1-nano") -> SummaryResult:
+async def summarize(
+    messages_text: str, level: str, style: str = "instruction", model: str = "gpt-4.1-nano"
+) -> SummaryResult:
     if level not in LEVEL_PROMPTS:
         raise ValueError(f"Unknown level: {level}. Must be one of: {', '.join(LEVEL_PROMPTS)}")
+    if style not in STYLE_PROMPTS:
+        raise ValueError(f"Unknown style: {style}. Must be one of: {', '.join(STYLE_PROMPTS)}")
+
+    instructions = LEVEL_PROMPTS[level] + "\n\n" + STYLE_PROMPTS[style]
 
     agent = Agent(
         name="Summarizer",
-        instructions=LEVEL_PROMPTS[level],
+        instructions=instructions,
         model=model,
     )
 

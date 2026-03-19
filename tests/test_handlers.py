@@ -65,6 +65,7 @@ class TestUserSession:
         assert session.messages == []
         assert session.level == "mid"
         assert session.fmt == "markdown"
+        assert session.style == "instruction"
         assert session.save_media is False
 
     def test_get_session_returns_existing(self):
@@ -89,7 +90,7 @@ class TestBuildFormKeyboard:
         keyboard = build_form_keyboard(session)
         rows = keyboard.inline_keyboard
 
-        assert len(rows) == 5  # level, format, media, confirm, help
+        assert len(rows) == 6  # level, format, style, media, confirm, help
 
         # Level row - mid selected
         level_texts = [b.text for b in rows[0]]
@@ -99,15 +100,19 @@ class TestBuildFormKeyboard:
         fmt_texts = [b.text for b in rows[1]]
         assert fmt_texts == ["[MD]", "PDF", "DOCX"]
 
+        # Style row - instruction selected
+        style_texts = [b.text for b in rows[2]]
+        assert style_texts == ["Keep original", "[Instruction]", "Blog"]
+
         # Media row - no selected
-        media_texts = [b.text for b in rows[2]]
+        media_texts = [b.text for b in rows[3]]
         assert media_texts == ["Use media", "[no media]"]
 
         # Confirm
-        assert rows[3][0].text == "Confirm"
+        assert rows[4][0].text == "Confirm"
 
     def test_custom_selections(self):
-        session = UserSession(level="max", fmt="pdf", save_media=True)
+        session = UserSession(level="max", fmt="pdf", style="blog", save_media=True)
         keyboard = build_form_keyboard(session)
         rows = keyboard.inline_keyboard
 
@@ -117,7 +122,10 @@ class TestBuildFormKeyboard:
         fmt_texts = [b.text for b in rows[1]]
         assert fmt_texts == ["MD", "[PDF]", "DOCX"]
 
-        media_texts = [b.text for b in rows[2]]
+        style_texts = [b.text for b in rows[2]]
+        assert style_texts == ["Keep original", "Instruction", "[Blog]"]
+
+        media_texts = [b.text for b in rows[3]]
         assert media_texts == ["[Use media]", "no media"]
 
     def test_callback_data(self):
@@ -131,9 +139,33 @@ class TestBuildFormKeyboard:
         assert rows[1][0].callback_data == "fmt:markdown"
         assert rows[1][1].callback_data == "fmt:pdf"
         assert rows[1][2].callback_data == "fmt:docx"
-        assert rows[2][0].callback_data == "media:yes"
-        assert rows[2][1].callback_data == "media:no"
-        assert rows[3][0].callback_data == "confirm"
+        assert rows[2][0].callback_data == "style:original"
+        assert rows[2][1].callback_data == "style:instruction"
+        assert rows[2][2].callback_data == "style:blog"
+        assert rows[3][0].callback_data == "media:yes"
+        assert rows[3][1].callback_data == "media:no"
+        assert rows[4][0].callback_data == "confirm"
+
+    def test_style_original_selected(self):
+        session = UserSession(style="original")
+        keyboard = build_form_keyboard(session)
+        rows = keyboard.inline_keyboard
+        style_texts = [b.text for b in rows[2]]
+        assert style_texts == ["[Keep original]", "Instruction", "Blog"]
+
+    def test_style_instruction_selected(self):
+        session = UserSession(style="instruction")
+        keyboard = build_form_keyboard(session)
+        rows = keyboard.inline_keyboard
+        style_texts = [b.text for b in rows[2]]
+        assert style_texts == ["Keep original", "[Instruction]", "Blog"]
+
+    def test_style_blog_selected(self):
+        session = UserSession(style="blog")
+        keyboard = build_form_keyboard(session)
+        rows = keyboard.inline_keyboard
+        style_texts = [b.text for b in rows[2]]
+        assert style_texts == ["Keep original", "Instruction", "[Blog]"]
 
 
 class TestStartHandler:
@@ -423,6 +455,71 @@ class TestCallbackHandler:
         mock_um.record_usage.assert_called_once_with("testuser", 50000, 50000)
 
     @pytest.mark.asyncio
+    async def test_style_change(self):
+        get_session(123)
+        update = self._make_callback_update("style:blog")
+        context = make_context()
+        await callback_handler(update, context)
+        session = get_session(123)
+        assert session.style == "blog"
+        update.callback_query.edit_message_reply_markup.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_style_change_original(self):
+        get_session(123)
+        update = self._make_callback_update("style:original")
+        context = make_context()
+        await callback_handler(update, context)
+        session = get_session(123)
+        assert session.style == "original"
+
+    @pytest.mark.asyncio
+    async def test_style_invalid_ignored(self):
+        get_session(123)
+        update = self._make_callback_update("style:invalid")
+        context = make_context()
+        await callback_handler(update, context)
+        session = get_session(123)
+        assert session.style == "instruction"  # Default unchanged
+
+    @pytest.mark.asyncio
+    async def test_help_includes_styles(self):
+        get_session(123)
+        update = self._make_callback_update("help")
+        context = make_context()
+        await callback_handler(update, context)
+        help_text = update.callback_query.message.reply_text.call_args[0][0]
+        assert "Keep original" in help_text
+        assert "Instruction" in help_text
+        assert "Blog" in help_text
+        assert "Styles" in help_text
+
+    @pytest.mark.asyncio
+    async def test_confirm_passes_style_to_summarize(self):
+        session = get_session(123)
+        session.messages = ["test message"]
+        session.style = "blog"
+
+        update = self._make_callback_update("confirm")
+        mock_um = MagicMock()
+        mock_um.check_limits.return_value = True
+        context = make_context(user_manager=mock_um)
+
+        mock_result = MagicMock()
+        mock_result.text = "Summary text"
+        mock_result.input_tokens = 10
+        mock_result.output_tokens = 5
+
+        with patch(
+            "telegram_summarizer.handlers.summarize",
+            new_callable=AsyncMock,
+            return_value=mock_result,
+        ) as mock_summarize:
+            await callback_handler(update, context)
+
+        assert mock_summarize.call_args[1]["style"] == "blog"
+
+    @pytest.mark.asyncio
     async def test_callback_invalid_level_ignored(self):
         get_session(123)
         update = self._make_callback_update("level:invalid")
@@ -534,6 +631,7 @@ class TestCallbackHandler:
         session.messages = ["msg1", "msg2", "msg3"]
         session.media_file_ids = [{"type": "photo", "file_id": "p1"}]
         session.level = "max"
+        session.style = "blog"
         session.fmt = "pdf"
         session.save_media = True
 
@@ -560,6 +658,7 @@ class TestCallbackHandler:
         assert "messages=3" in msg
         assert "media=1" in msg
         assert "level=max" in msg
+        assert "style=blog" in msg
         assert "format=pdf" in msg
         assert "save_media=True" in msg
         assert "input_tokens=1234" in msg
@@ -638,6 +737,7 @@ class TestReprocessCommandHandler:
             "media_file_ids": [{"type": "photo", "file_id": "p1"}],
             "level": "max",
             "fmt": "pdf",
+            "style": "blog",
             "save_media": True,
         }
         update = make_update()
@@ -652,8 +752,25 @@ class TestReprocessCommandHandler:
         assert session.messages == ["msg1", "msg2"]
         assert session.level == "max"
         assert session.fmt == "pdf"
+        assert session.style == "blog"
         assert session.save_media is True
         assert len(session.media_file_ids) == 1
+
+    @pytest.mark.asyncio
+    async def test_reprocess_defaults_style_when_missing(self):
+        _last_processed[123] = {
+            "messages": ["msg1"],
+            "media_file_ids": [],
+            "level": "mid",
+            "fmt": "markdown",
+            "save_media": False,
+        }
+        update = make_update()
+        context = make_context()
+        await reprocess_command_handler(update, context)
+
+        session = get_session(123)
+        assert session.style == "instruction"
 
     @pytest.mark.asyncio
     async def test_last_processed_saved_after_confirm(self):
@@ -661,6 +778,7 @@ class TestReprocessCommandHandler:
         session.messages = ["test message"]
         session.level = "min"
         session.fmt = "docx"
+        session.style = "original"
         session.save_media = True
         session.media_file_ids = [{"type": "photo", "file_id": "p1"}]
 
@@ -691,4 +809,5 @@ class TestReprocessCommandHandler:
         assert _last_processed[123]["messages"] == ["test message"]
         assert _last_processed[123]["level"] == "min"
         assert _last_processed[123]["fmt"] == "docx"
+        assert _last_processed[123]["style"] == "original"
         assert _last_processed[123]["save_media"] is True

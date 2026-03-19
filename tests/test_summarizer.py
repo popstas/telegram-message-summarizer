@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from telegram_summarizer.summarizer import LEVEL_PROMPTS, SummaryResult, summarize
+from telegram_summarizer.summarizer import LEVEL_PROMPTS, STYLE_PROMPTS, SummaryResult, summarize
 
 
 def _make_mock_result(output_text="Summary text", input_tokens=100, output_tokens=50):
@@ -26,14 +26,8 @@ def mock_runner():
         yield mock
 
 
-@pytest.fixture
-def mock_config():
-    """No longer needed since summarize() takes model param directly, but kept for compatibility."""
-    yield
-
-
 @pytest.mark.asyncio
-async def test_summarize_min_level(mock_runner, mock_config):
+async def test_summarize_min_level(mock_runner):
     mock_runner.run.return_value = _make_mock_result("Light summary")
 
     result = await summarize("Hello world messages", "min")
@@ -43,39 +37,40 @@ async def test_summarize_min_level(mock_runner, mock_config):
     assert result.output_tokens == 50
 
     agent_arg = mock_runner.run.call_args[0][0]
-    assert agent_arg.instructions == LEVEL_PROMPTS["min"]
+    assert LEVEL_PROMPTS["min"] in agent_arg.instructions
+    assert STYLE_PROMPTS["instruction"] in agent_arg.instructions
 
 
 @pytest.mark.asyncio
-async def test_summarize_mid_level(mock_runner, mock_config):
+async def test_summarize_mid_level(mock_runner):
     mock_runner.run.return_value = _make_mock_result("Balanced summary")
 
     result = await summarize("Some messages", "mid")
 
     assert result.text == "Balanced summary"
     agent_arg = mock_runner.run.call_args[0][0]
-    assert agent_arg.instructions == LEVEL_PROMPTS["mid"]
+    assert LEVEL_PROMPTS["mid"] in agent_arg.instructions
 
 
 @pytest.mark.asyncio
-async def test_summarize_max_level(mock_runner, mock_config):
+async def test_summarize_max_level(mock_runner):
     mock_runner.run.return_value = _make_mock_result("Brief summary")
 
     result = await summarize("Long messages here", "max")
 
     assert result.text == "Brief summary"
     agent_arg = mock_runner.run.call_args[0][0]
-    assert agent_arg.instructions == LEVEL_PROMPTS["max"]
+    assert LEVEL_PROMPTS["max"] in agent_arg.instructions
 
 
 @pytest.mark.asyncio
-async def test_summarize_invalid_level(mock_runner, mock_config):
+async def test_summarize_invalid_level(mock_runner):
     with pytest.raises(ValueError, match="Unknown level"):
         await summarize("text", "invalid")
 
 
 @pytest.mark.asyncio
-async def test_summarize_token_counting(mock_runner, mock_config):
+async def test_summarize_token_counting(mock_runner):
     mock_runner.run.return_value = _make_mock_result("Result", input_tokens=500, output_tokens=200)
 
     result = await summarize("text", "min")
@@ -85,7 +80,7 @@ async def test_summarize_token_counting(mock_runner, mock_config):
 
 
 @pytest.mark.asyncio
-async def test_summarize_multiple_responses(mock_runner, mock_config):
+async def test_summarize_multiple_responses(mock_runner):
     usage1 = MagicMock()
     usage1.input_tokens = 100
     usage1.output_tokens = 50
@@ -109,12 +104,12 @@ async def test_summarize_multiple_responses(mock_runner, mock_config):
     assert result.text == "Final"
     assert isinstance(result, SummaryResult)
     # Usage.add accumulates tokens from both responses
-    assert result.input_tokens > 0
-    assert result.output_tokens > 0
+    assert result.input_tokens == 300
+    assert result.output_tokens == 130
 
 
 @pytest.mark.asyncio
-async def test_summarize_uses_configured_model(mock_runner, mock_config):
+async def test_summarize_uses_configured_model(mock_runner):
     mock_runner.run.return_value = _make_mock_result()
 
     await summarize("text", "min", model="gpt-5-nano")
@@ -124,10 +119,82 @@ async def test_summarize_uses_configured_model(mock_runner, mock_config):
 
 
 @pytest.mark.asyncio
-async def test_summarize_passes_messages_as_input(mock_runner, mock_config):
+async def test_summarize_passes_messages_as_input(mock_runner):
     mock_runner.run.return_value = _make_mock_result()
 
     await summarize("Message 1\nMessage 2\nMessage 3", "mid")
 
     input_arg = mock_runner.run.call_args[0][1]
     assert input_arg == "Message 1\nMessage 2\nMessage 3"
+
+
+@pytest.mark.asyncio
+async def test_summarize_with_original_style(mock_runner):
+    mock_runner.run.return_value = _make_mock_result("Original style output")
+
+    result = await summarize("text", "min", style="original")
+
+    assert result.text == "Original style output"
+    agent_arg = mock_runner.run.call_args[0][0]
+    assert STYLE_PROMPTS["original"] in agent_arg.instructions
+    assert LEVEL_PROMPTS["min"] in agent_arg.instructions
+
+
+@pytest.mark.asyncio
+async def test_summarize_with_blog_style(mock_runner):
+    mock_runner.run.return_value = _make_mock_result("Blog style output")
+
+    result = await summarize("text", "mid", style="blog")
+
+    assert result.text == "Blog style output"
+    agent_arg = mock_runner.run.call_args[0][0]
+    assert STYLE_PROMPTS["blog"] in agent_arg.instructions
+    assert LEVEL_PROMPTS["mid"] in agent_arg.instructions
+
+
+@pytest.mark.asyncio
+async def test_summarize_default_style_is_instruction(mock_runner):
+    mock_runner.run.return_value = _make_mock_result()
+
+    await summarize("text", "min")
+
+    agent_arg = mock_runner.run.call_args[0][0]
+    assert STYLE_PROMPTS["instruction"] in agent_arg.instructions
+
+
+@pytest.mark.asyncio
+async def test_summarize_invalid_style(mock_runner):
+    with pytest.raises(ValueError, match="Unknown style"):
+        await summarize("text", "min", style="invalid")
+
+
+@pytest.mark.asyncio
+async def test_summarize_prompt_combination(mock_runner):
+    mock_runner.run.return_value = _make_mock_result()
+
+    await summarize("text", "max", style="blog")
+
+    agent_arg = mock_runner.run.call_args[0][0]
+    expected = LEVEL_PROMPTS["max"] + "\n\n" + STYLE_PROMPTS["blog"]
+    assert agent_arg.instructions == expected
+
+
+def test_all_style_prompts_are_distinct():
+    styles = list(STYLE_PROMPTS.values())
+    assert len(styles) == 3
+    assert len(set(styles)) == 3, "All style prompts must be unique"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "level,style",
+    [(level, style) for level in ["min", "mid", "max"] for style in ["original", "instruction", "blog"]],
+)
+async def test_all_level_style_combinations(mock_runner, level, style):
+    mock_runner.run.return_value = _make_mock_result()
+
+    await summarize("test text", level, style=style)
+
+    agent_arg = mock_runner.run.call_args[0][0]
+    expected = LEVEL_PROMPTS[level] + "\n\n" + STYLE_PROMPTS[style]
+    assert agent_arg.instructions == expected

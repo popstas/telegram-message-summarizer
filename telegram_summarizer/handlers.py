@@ -7,7 +7,7 @@ from telegram.ext import ContextTypes
 
 from telegram_summarizer.config import get_user_limits
 from telegram_summarizer.exporter import export_docx, export_pdf
-from telegram_summarizer.summarizer import LEVEL_PROMPTS, summarize
+from telegram_summarizer.summarizer import LEVEL_PROMPTS, STYLE_PROMPTS, summarize
 from telegram_summarizer.user_manager import NoUsernameError
 
 VALID_FORMATS = {"markdown", "pdf", "docx"}
@@ -24,6 +24,7 @@ class UserSession:
     media_file_ids: list[dict] = field(default_factory=list)
     level: str = "mid"
     fmt: str = "markdown"
+    style: str = "instruction"
     save_media: bool = False
     batch_task: asyncio.Task | None = field(default=None, repr=False)
 
@@ -60,6 +61,12 @@ def build_form_keyboard(session: UserSession) -> InlineKeyboardMarkup:
         text = f"[{label}]" if session.fmt == key else label
         fmt_buttons.append(InlineKeyboardButton(text, callback_data=f"fmt:{key}"))
 
+    style_labels = {"original": "Keep original", "instruction": "Instruction", "blog": "Blog"}
+    style_buttons = []
+    for key, label in style_labels.items():
+        text = f"[{label}]" if session.style == key else label
+        style_buttons.append(InlineKeyboardButton(text, callback_data=f"style:{key}"))
+
     media_text = "[Use media]" if session.save_media else "Use media"
     no_media_text = "[no media]" if not session.save_media else "no media"
     media_buttons = [
@@ -74,6 +81,7 @@ def build_form_keyboard(session: UserSession) -> InlineKeyboardMarkup:
         [
             level_buttons,
             fmt_buttons,
+            style_buttons,
             media_buttons,
             confirm_button,
             help_button,
@@ -218,6 +226,7 @@ async def reprocess_command_handler(update: Update, context: ContextTypes.DEFAUL
     session.media_file_ids = [dict(m) for m in data["media_file_ids"]]
     session.level = data["level"]
     session.fmt = data["fmt"]
+    session.style = data.get("style", "instruction")
     session.save_media = data["save_media"]
 
     text = _build_form_text(session)
@@ -249,6 +258,11 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             "• *Mid* — balanced summary, keeps key points\n"
             "• *Max* — heavily condensed, essential points only\n"
             "\n"
+            "✍️ *Styles:*\n"
+            "• *Keep original* — preserves author's voice, only cleans up chat artifacts\n"
+            "• *Instruction* — clear, structured instructional document\n"
+            "• *Blog* — engaging blog post with narrative style\n"
+            "\n"
             "📄 *Formats:*\n"
             "• *MD* — Telegram message\n"
             "• *PDF* — PDF file\n"
@@ -272,6 +286,9 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     elif prefix == "fmt":
         if value in VALID_FORMATS:
             session.fmt = value
+    elif prefix == "style":
+        if value in STYLE_PROMPTS:
+            session.style = value
     elif prefix == "media":
         session.save_media = value == "yes"
 
@@ -304,7 +321,7 @@ async def _process_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, u
         return
     try:
         model = config.get("openai_model", "gpt-4.1-nano")
-        result = await summarize(combined_text, session.level, model=model)
+        result = await summarize(combined_text, session.level, style=session.style, model=model)
     except Exception as e:
         logger.error("Summarization failed: %s", e, exc_info=True)
         await query.edit_message_text("Summarization failed. Please try again later.")
@@ -315,12 +332,13 @@ async def _process_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, u
     user_manager.record_usage(username, result.input_tokens, result.output_tokens)
 
     logger.info(
-        "Summary completed: user=@%s messages=%d media=%d level=%s format=%s"
+        "Summary completed: user=@%s messages=%d media=%d level=%s style=%s format=%s"
         " save_media=%s input_tokens=%d output_tokens=%d",
         username,
         len(session.messages),
         len(session.media_file_ids),
         session.level,
+        session.style,
         session.fmt,
         session.save_media,
         result.input_tokens,
@@ -369,6 +387,7 @@ async def _process_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, u
             "media_file_ids": [dict(m) for m in session.media_file_ids],
             "level": session.level,
             "fmt": session.fmt,
+            "style": session.style,
             "save_media": session.save_media,
         }
         clear_session(user_id)
