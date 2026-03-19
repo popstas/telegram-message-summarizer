@@ -35,7 +35,27 @@ pytestmark = [
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
-async def client():
+async def running_bot():
+    """Start a bot instance using test_bot_token for the duration of e2e tests."""
+    from telegram_summarizer.bot import create_application
+
+    config = load_config()
+    config["bot_token"] = _test_bot_token
+    app = create_application(config)
+
+    await app.initialize()
+    await app.start()
+    await app.updater.start_polling()
+
+    yield app
+
+    await app.updater.stop()
+    await app.stop()
+    await app.shutdown()
+
+
+@pytest_asyncio.fixture(scope="module", loop_scope="module")
+async def client(running_bot):
     from telethon import TelegramClient
 
     session_path = os.environ.get("TELEGRAM_SESSION", "data/e2e_session")
