@@ -60,14 +60,15 @@ def build_form_keyboard(session: UserSession) -> InlineKeyboardMarkup:
         text = f"[{label}]" if session.fmt == key else label
         fmt_buttons.append(InlineKeyboardButton(text, callback_data=f"fmt:{key}"))
 
-    media_text = "[Yes]" if session.save_media else "Yes"
-    no_media_text = "[No]" if not session.save_media else "No"
+    media_text = "[Use media]" if session.save_media else "Use media"
+    no_media_text = "[no media]" if not session.save_media else "no media"
     media_buttons = [
         InlineKeyboardButton(media_text, callback_data="media:yes"),
         InlineKeyboardButton(no_media_text, callback_data="media:no"),
     ]
 
     confirm_button = [InlineKeyboardButton("Confirm", callback_data="confirm")]
+    help_button = [InlineKeyboardButton("❓ Help", callback_data="help")]
 
     return InlineKeyboardMarkup(
         [
@@ -75,6 +76,7 @@ def build_form_keyboard(session: UserSession) -> InlineKeyboardMarkup:
             fmt_buttons,
             media_buttons,
             confirm_button,
+            help_button,
         ]
     )
 
@@ -238,6 +240,25 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     if data == "confirm":
         await _process_summary(update, context, user_id)
+        return
+
+    if data == "help":
+        await query.message.reply_text(
+            "📋 *Processing levels:*\n"
+            "• *Min* — close to original, preserves quotes and structure\n"
+            "• *Mid* — balanced summary, keeps key points\n"
+            "• *Max* — heavily condensed, essential points only\n"
+            "\n"
+            "📄 *Formats:*\n"
+            "• *MD* — Telegram message\n"
+            "• *PDF* — PDF file\n"
+            "• *DOCX* — Word file\n"
+            "\n"
+            "🖼 *Media:*\n"
+            "Attach forwarded photos, videos, and documents to the result "
+            "(only for PDF/DOCX formats).",
+            parse_mode="Markdown",
+        )
         return
 
     parts = data.split(":", 1)

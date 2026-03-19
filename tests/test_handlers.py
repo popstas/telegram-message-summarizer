@@ -89,7 +89,7 @@ class TestBuildFormKeyboard:
         keyboard = build_form_keyboard(session)
         rows = keyboard.inline_keyboard
 
-        assert len(rows) == 4  # level, format, media, confirm
+        assert len(rows) == 5  # level, format, media, confirm, help
 
         # Level row - mid selected
         level_texts = [b.text for b in rows[0]]
@@ -101,7 +101,7 @@ class TestBuildFormKeyboard:
 
         # Media row - no selected
         media_texts = [b.text for b in rows[2]]
-        assert media_texts == ["Yes", "[No]"]
+        assert media_texts == ["Use media", "[no media]"]
 
         # Confirm
         assert rows[3][0].text == "Confirm"
@@ -118,7 +118,7 @@ class TestBuildFormKeyboard:
         assert fmt_texts == ["MD", "[PDF]", "DOCX"]
 
         media_texts = [b.text for b in rows[2]]
-        assert media_texts == ["[Yes]", "No"]
+        assert media_texts == ["[Use media]", "no media"]
 
     def test_callback_data(self):
         session = UserSession()
