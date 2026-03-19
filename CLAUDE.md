@@ -31,7 +31,7 @@ python -m telegram_summarizer
 # Tests
 pytest
 pytest tests/test_module.py::test_function  # single test
-pytest -m e2e  # end-to-end tests (requires test_bot_token + Telegram API credentials)
+bash data/e2e-test.sh # run e2e tests with filled tokens
 
 # Code quality
 ruff check .
