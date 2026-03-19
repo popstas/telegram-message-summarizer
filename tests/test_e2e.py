@@ -41,6 +41,11 @@ async def running_bot():
 
     config = load_config()
     config["bot_token"] = _test_bot_token
+
+    # Set OpenAI API key from config (normally done in __main__.py)
+    if config.get("openai_api_key") and not os.environ.get("OPENAI_API_KEY"):
+        os.environ["OPENAI_API_KEY"] = config["openai_api_key"]
+
     app = create_application(config)
 
     await app.initialize()
@@ -116,14 +121,53 @@ class TestE2ECommands:
 
     async def test_forward_and_process_shows_form(self, client, bot_entity):
         """Test forwarding a message then /process shows the options form."""
-        # Send a message to Saved Messages (self), then forward it to the bot
-        me = await client.get_me()
-        sent = await client.send_message(me, "Test message for summarization")
-        await client.forward_messages(bot_entity, sent, me)
+        # Get a bot message to forward (bot messages have forward_origin when forwarded)
+        messages = await client.get_messages(bot_entity, limit=5)
+        bot_msg = next((m for m in messages if not m.out), None)
+        assert bot_msg is not None, "No bot message found to forward"
+        await client.forward_messages(bot_entity, bot_msg, bot_entity)
         await asyncio.sleep(1)
         responses = await _send_and_wait(client, bot_entity, "/process", wait_seconds=4)
         assert len(responses) > 0
-        # The form should have inline keyboard buttons or mention "Collected"
         latest = responses[0]
         has_form = (latest.text and "Collected" in latest.text) or latest.buttons is not None
         assert has_form, f"Expected form response, got: {latest.text}"
+
+    async def test_reprocess_after_process(self, client, bot_entity):
+        """Test /reprocess after a successful process re-shows the form."""
+        # Find the form message with "Collected" from the previous test
+        messages = await client.get_messages(bot_entity, limit=10)
+        form_msg = None
+        for m in messages:
+            if not m.out and m.text and "Collected" in m.text:
+                form_msg = m
+                break
+        assert form_msg is not None, (
+            f"No form message found in: "
+            f"{[(m.id, m.out, m.text[:50] if m.text else None) for m in messages]}"
+        )
+
+        # Click Confirm button if buttons are present
+        if form_msg.buttons:
+            for row in form_msg.buttons:
+                for btn in row:
+                    if "Confirm" in btn.text:
+                        await btn.click()
+                        break
+        else:
+            # Buttons may not be accessible via get_messages; use callback directly
+            from telethon.tl.functions.messages import GetBotCallbackAnswerRequest
+            await client(GetBotCallbackAnswerRequest(
+                peer=bot_entity,
+                msg_id=form_msg.id,
+                data=b"confirm",
+            ))
+
+        await asyncio.sleep(15)  # wait for OpenAI processing
+
+        # Now test /reprocess
+        responses = await _send_and_wait(client, bot_entity, "/reprocess", wait_seconds=5)
+        assert len(responses) > 0
+        latest = responses[0]
+        has_form = (latest.text and "Collected" in latest.text) or latest.buttons is not None
+        assert has_form, f"Expected reprocess form, got: {latest.text}"
