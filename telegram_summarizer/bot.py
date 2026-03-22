@@ -27,7 +27,15 @@ def create_application(config: dict | None = None) -> Application:
     if config is None:
         config = load_config()
 
-    app = Application.builder().token(config["bot_token"]).build()
+    builder = Application.builder().token(config["bot_token"])
+
+    proxy_url = config.get("proxy_url", "")
+    if proxy_url:
+        if "://" not in proxy_url:
+            proxy_url = f"http://{proxy_url}"
+        builder = builder.proxy(proxy_url).get_updates_proxy(proxy_url)
+
+    app = builder.build()
     app.bot_data["config"] = config
     app.bot_data["user_manager"] = UserManager()
 

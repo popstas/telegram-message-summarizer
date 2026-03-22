@@ -17,6 +17,7 @@ DEFAULT_CONFIG = {
     },
     "users": {},
     "test_bot_token": "",
+    "proxy_url": "",
 }
 
 
