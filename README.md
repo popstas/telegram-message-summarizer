@@ -6,7 +6,7 @@ Telegram bot that summarizes forwarded messages using OpenAI. Forward a batch of
 
 - Collect forwarded messages in batches (3-second auto-timeout)
 - Three summarization levels: min (light rewrite), mid (balanced), max (heavy condensation)
-- Three summarization styles: Keep original (preserve author's voice), Instruction (clear structured document), Blog (engaging narrative)
+- Four summarization styles: Keep original (preserve author's voice), Summary (concise key points), Instruction (clear structured document), Blog (engaging narrative)
 - Output formats: Markdown, PDF, DOCX
 - Per-user token limits (daily, configurable per username)
 - Username-based access control

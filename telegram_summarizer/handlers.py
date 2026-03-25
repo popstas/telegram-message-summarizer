@@ -61,7 +61,7 @@ def build_form_keyboard(session: UserSession) -> InlineKeyboardMarkup:
         text = f"[{label}]" if session.fmt == key else label
         fmt_buttons.append(InlineKeyboardButton(text, callback_data=f"fmt:{key}"))
 
-    style_labels = {"original": "Keep original", "instruction": "Instruction", "blog": "Blog"}
+    style_labels = {"original": "Keep original", "summary": "Summary", "instruction": "Instruction", "blog": "Blog"}
     style_buttons = []
     for key, label in style_labels.items():
         text = f"[{label}]" if session.style == key else label
@@ -260,6 +260,7 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             "\n"
             "✍️ *Styles:*\n"
             "• *Keep original* — preserves author's voice, only cleans up chat artifacts\n"
+            "• *Summary* — concise summary of key points\n"
             "• *Instruction* — clear, structured instructional document\n"
             "• *Blog* — engaging blog post with narrative style\n"
             "\n"
