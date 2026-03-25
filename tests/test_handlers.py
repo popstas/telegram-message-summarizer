@@ -102,7 +102,7 @@ class TestBuildFormKeyboard:
 
         # Style row - instruction selected
         style_texts = [b.text for b in rows[2]]
-        assert style_texts == ["Keep original", "[Instruction]", "Blog"]
+        assert style_texts == ["Keep original", "Summary", "[Instruction]", "Blog"]
 
         # Media row - no selected
         media_texts = [b.text for b in rows[3]]
@@ -123,7 +123,7 @@ class TestBuildFormKeyboard:
         assert fmt_texts == ["MD", "[PDF]", "DOCX"]
 
         style_texts = [b.text for b in rows[2]]
-        assert style_texts == ["Keep original", "Instruction", "[Blog]"]
+        assert style_texts == ["Keep original", "Summary", "Instruction", "[Blog]"]
 
         media_texts = [b.text for b in rows[3]]
         assert media_texts == ["[Use media]", "no media"]
@@ -140,8 +140,9 @@ class TestBuildFormKeyboard:
         assert rows[1][1].callback_data == "fmt:pdf"
         assert rows[1][2].callback_data == "fmt:docx"
         assert rows[2][0].callback_data == "style:original"
-        assert rows[2][1].callback_data == "style:instruction"
-        assert rows[2][2].callback_data == "style:blog"
+        assert rows[2][1].callback_data == "style:summary"
+        assert rows[2][2].callback_data == "style:instruction"
+        assert rows[2][3].callback_data == "style:blog"
         assert rows[3][0].callback_data == "media:yes"
         assert rows[3][1].callback_data == "media:no"
         assert rows[4][0].callback_data == "confirm"
@@ -151,21 +152,21 @@ class TestBuildFormKeyboard:
         keyboard = build_form_keyboard(session)
         rows = keyboard.inline_keyboard
         style_texts = [b.text for b in rows[2]]
-        assert style_texts == ["[Keep original]", "Instruction", "Blog"]
+        assert style_texts == ["[Keep original]", "Summary", "Instruction", "Blog"]
 
     def test_style_instruction_selected(self):
         session = UserSession(style="instruction")
         keyboard = build_form_keyboard(session)
         rows = keyboard.inline_keyboard
         style_texts = [b.text for b in rows[2]]
-        assert style_texts == ["Keep original", "[Instruction]", "Blog"]
+        assert style_texts == ["Keep original", "Summary", "[Instruction]", "Blog"]
 
     def test_style_blog_selected(self):
         session = UserSession(style="blog")
         keyboard = build_form_keyboard(session)
         rows = keyboard.inline_keyboard
         style_texts = [b.text for b in rows[2]]
-        assert style_texts == ["Keep original", "Instruction", "[Blog]"]
+        assert style_texts == ["Keep original", "Summary", "Instruction", "[Blog]"]
 
 
 class TestStartHandler:
@@ -492,6 +493,7 @@ class TestCallbackHandler:
         assert "Keep original" in help_text
         assert "Instruction" in help_text
         assert "Blog" in help_text
+        assert "Summary" in help_text
         assert "Styles" in help_text
 
     @pytest.mark.asyncio

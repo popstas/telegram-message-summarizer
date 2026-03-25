@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Telegram bot for summarizing forwarded messages. Users forward a batch of messages, choose processing level (min/mid/max), summarization style (original/instruction/blog), output format (markdown/pdf/docx), and whether to save media. The bot summarizes via OpenAI API and returns the result with optional file attachments.
+Telegram bot for summarizing forwarded messages. Users forward a batch of messages, choose processing level (min/mid/max), summarization style (original/summary/instruction/blog), output format (markdown/pdf/docx), and whether to save media. The bot summarizes via OpenAI API and returns the result with optional file attachments.
 
 ## Tech Stack
 

@@ -19,6 +19,11 @@ STYLE_PROMPTS = {
         "Use a natural, readable narrative style with smooth transitions. "
         "Output as a single cohesive document."
     ),
+    "summary": (
+        "Summarize the key points concisely. Remove all chat artifacts, filler, "
+        "and redundancy. Focus on extracting the most important information and "
+        "presenting it as a brief, structured summary. Output as a single cohesive document."
+    ),
 }
 
 LEVEL_PROMPTS = {

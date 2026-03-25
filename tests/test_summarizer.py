@@ -153,6 +153,18 @@ async def test_summarize_with_blog_style(mock_runner):
 
 
 @pytest.mark.asyncio
+async def test_summarize_with_summary_style(mock_runner):
+    mock_runner.run.return_value = _make_mock_result("Summary style output")
+
+    result = await summarize("text", "mid", style="summary")
+
+    assert result.text == "Summary style output"
+    agent_arg = mock_runner.run.call_args[0][0]
+    assert STYLE_PROMPTS["summary"] in agent_arg.instructions
+    assert LEVEL_PROMPTS["mid"] in agent_arg.instructions
+
+
+@pytest.mark.asyncio
 async def test_summarize_default_style_is_instruction(mock_runner):
     mock_runner.run.return_value = _make_mock_result()
 
@@ -181,14 +193,14 @@ async def test_summarize_prompt_combination(mock_runner):
 
 def test_all_style_prompts_are_distinct():
     styles = list(STYLE_PROMPTS.values())
-    assert len(styles) == 3
-    assert len(set(styles)) == 3, "All style prompts must be unique"
+    assert len(styles) == 4
+    assert len(set(styles)) == 4, "All style prompts must be unique"
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "level,style",
-    [(level, style) for level in ["min", "mid", "max"] for style in ["original", "instruction", "blog"]],
+    [(level, style) for level in ["min", "mid", "max"] for style in ["original", "summary", "instruction", "blog"]],
 )
 async def test_all_level_style_combinations(mock_runner, level, style):
     mock_runner.run.return_value = _make_mock_result()

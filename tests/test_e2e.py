@@ -143,8 +143,7 @@ class TestE2ECommands:
                 form_msg = m
                 break
         assert form_msg is not None, (
-            f"No form message found in: "
-            f"{[(m.id, m.out, m.text[:50] if m.text else None) for m in messages]}"
+            f"No form message found in: {[(m.id, m.out, m.text[:50] if m.text else None) for m in messages]}"
         )
 
         # Click Confirm button if buttons are present
@@ -157,11 +156,14 @@ class TestE2ECommands:
         else:
             # Buttons may not be accessible via get_messages; use callback directly
             from telethon.tl.functions.messages import GetBotCallbackAnswerRequest
-            await client(GetBotCallbackAnswerRequest(
-                peer=bot_entity,
-                msg_id=form_msg.id,
-                data=b"confirm",
-            ))
+
+            await client(
+                GetBotCallbackAnswerRequest(
+                    peer=bot_entity,
+                    msg_id=form_msg.id,
+                    data=b"confirm",
+                )
+            )
 
         await asyncio.sleep(15)  # wait for OpenAI processing
 
