@@ -84,14 +84,28 @@ async def bot_entity(client):
     return entity
 
 
-async def _send_and_wait(client, entity, text, wait_seconds=3):
+async def _send_and_wait(client, entity, text, wait_seconds=3, limit=3):
     """Send a message to the bot and wait for a response."""
     await client.send_message(entity, text)
     await asyncio.sleep(wait_seconds)
-    messages = await client.get_messages(entity, limit=3)
+    messages = await client.get_messages(entity, limit=limit)
     # Return bot responses (messages not sent by us)
     bot_messages = [m for m in messages if not m.out]
     return bot_messages
+
+
+async def _click_callback(client, bot_entity, msg_id, data):
+    """Click an inline button by callback_data."""
+    from telethon.tl.functions.messages import GetBotCallbackAnswerRequest
+
+    await client(
+        GetBotCallbackAnswerRequest(
+            peer=bot_entity,
+            msg_id=msg_id,
+            data=data.encode() if isinstance(data, str) else data,
+        )
+    )
+    await asyncio.sleep(1)
 
 
 @pytest.mark.e2e
@@ -173,3 +187,82 @@ class TestE2ECommands:
         latest = responses[0]
         has_form = (latest.text and "Collected" in latest.text) or latest.buttons is not None
         assert has_form, f"Expected reprocess form, got: {latest.text}"
+
+    async def test_tlg_format_renders_code_blocks(self, client, bot_entity):
+        """Test that TLG format correctly renders inline code and code blocks.
+
+        Forwards a message containing code, processes with TLG format + original style,
+        and verifies Telegram parsed the MarkdownV2 successfully (code/pre entities present).
+        """
+        from telethon.tl.types import MessageEntityCode, MessageEntityPre
+
+        # Clear any previous session state
+        await _send_and_wait(client, bot_entity, "/clear", wait_seconds=2)
+
+        # Send a message with code, then forward it so the bot collects it
+        code_message = (
+            "Install:\n"
+            "```bash\n"
+            "npm i -g happy-coder\n"
+            "```\n\n"
+            "Run command: `happy codex`"
+        )
+        sent_msg = await client.send_message(bot_entity, code_message)
+        await asyncio.sleep(1)
+        await client.forward_messages(bot_entity, sent_msg, bot_entity)
+        await asyncio.sleep(2)
+
+        # Start processing — record message ID to filter responses later
+        pre_process_msgs = await client.get_messages(bot_entity, limit=1)
+        last_id_before = pre_process_msgs[0].id if pre_process_msgs else 0
+
+        responses = await _send_and_wait(client, bot_entity, "/process", wait_seconds=4)
+        assert len(responses) > 0
+        form_msg = responses[0]
+        assert form_msg.text and "Collected" in form_msg.text, (
+            f"Expected form, got: {form_msg.text}"
+        )
+
+        # Select style:original to preserve code formatting, TLG is default
+        await _click_callback(client, bot_entity, form_msg.id, "style:original")
+        # Disable media
+        await _click_callback(client, bot_entity, form_msg.id, "media:no")
+        # Confirm
+        await _click_callback(client, bot_entity, form_msg.id, "confirm")
+
+        # Wait for LLM processing
+        await asyncio.sleep(20)
+
+        # Get bot response messages sent AFTER we started processing
+        messages = await client.get_messages(bot_entity, limit=15)
+        bot_responses = [
+            m
+            for m in messages
+            if not m.out
+            and m.id > last_id_before
+            and m.text
+            and "Collected" not in m.text
+            and "Cleared" not in m.text
+        ]
+        assert len(bot_responses) > 0, (
+            f"No summary response received. "
+            f"All messages: {[(m.id, m.out, m.text[:60] if m.text else None) for m in messages]}"
+        )
+
+        # The summary response should have been sent with parse_mode=MarkdownV2.
+        # If MarkdownV2 parsing succeeded, Telegram creates entities for code/pre.
+        # Check that at least one response has code or pre entities.
+        has_code_entity = False
+        for msg in bot_responses:
+            if msg.entities:
+                for entity in msg.entities:
+                    if isinstance(entity, (MessageEntityCode, MessageEntityPre)):
+                        has_code_entity = True
+                        break
+            if has_code_entity:
+                break
+
+        assert has_code_entity, (
+            f"Expected code/pre entities in TLG response, but none found. "
+            f"Response texts: {[m.text[:200] for m in bot_responses]}"
+        )

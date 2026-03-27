@@ -86,6 +86,33 @@ class TestExportTlg:
         result = export_tlg("- **bold** item")
         assert result == "• *bold* item"
 
+    def test_inline_code_preserved(self):
+        assert export_tlg("use `foo.bar` here") == "use `foo.bar` here"
+
+    def test_inline_code_special_chars_not_escaped(self):
+        assert export_tlg("run `rm -f *` now") == "run `rm -f *` now"
+
+    def test_fenced_code_block(self):
+        text = "text\n```\nfoo.bar()\n```\nmore"
+        result = export_tlg(text)
+        assert result == "text\n```\nfoo.bar()\n```\nmore"
+
+    def test_fenced_code_block_strips_language(self):
+        text = "```bash\nnpm i -g happy-coder\n```"
+        result = export_tlg(text)
+        assert result == "```\nnpm i -g happy-coder\n```"
+
+    def test_fenced_code_block_no_escaping_inside(self):
+        text = "```\na.b! c*d\n```"
+        result = export_tlg(text)
+        assert result == "```\na.b! c*d\n```"
+
+    def test_inline_code_in_bullet(self):
+        assert export_tlg("- use `foo`") == "• use `foo`"
+
+    def test_inline_code_in_heading(self):
+        assert export_tlg("# Use `foo`") == "*Use `foo`*"
+
 
 class TestExportPdf:
     def test_returns_bytes(self):

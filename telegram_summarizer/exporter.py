@@ -54,17 +54,44 @@ def _convert_italic(text: str) -> str:
     return "".join(result)
 
 
+def _convert_inline_code(text: str) -> str:
+    """Handle inline `code` spans: preserve backticks, don't escape content inside."""
+    parts = re.split(r"(`[^`]+`)", text)
+    result = []
+    for part in parts:
+        if part.startswith("`") and part.endswith("`"):
+            result.append(part)  # code span: pass through verbatim
+        else:
+            result.append(_convert_inline(part))
+    return "".join(result)
+
+
 def export_tlg(summary_text: str) -> str:
     """Convert standard markdown to Telegram MarkdownV2 format."""
     lines = summary_text.split("\n")
     out = []
+    in_code_block = False
     for line in lines:
+        # Handle fenced code blocks
+        fence_match = re.match(r"^(\s*)```", line)
+        if fence_match:
+            if in_code_block:
+                out.append(fence_match.group(1) + "```")
+                in_code_block = False
+            else:
+                out.append(fence_match.group(1) + "```")
+                in_code_block = True
+            continue
+        if in_code_block:
+            out.append(line)
+            continue
+
         # Convert headings: # Heading → *Heading*
         heading_match = re.match(r"^(#{1,3})\s+(.*)", line)
         if heading_match:
             # Strip bold markers since the whole heading is already bold
             raw = re.sub(r"\*\*(.+?)\*\*", r"\1", heading_match.group(2).strip())
-            heading_text = _convert_italic(raw)
+            heading_text = _convert_inline_code(raw)
             out.append(f"*{heading_text}*")
             continue
 
@@ -73,10 +100,10 @@ def export_tlg(summary_text: str) -> str:
         bullet_match = re.match(r"^(\s*)-\s+(.*)", line)
         if bullet_match:
             indent = bullet_match.group(1)
-            rest = _convert_inline(bullet_match.group(2))
+            rest = _convert_inline_code(bullet_match.group(2))
             out.append(f"{indent}• {rest}")
         else:
-            out.append(_convert_inline(line))
+            out.append(_convert_inline_code(line))
 
     return "\n".join(out)
 

@@ -30,7 +30,8 @@ LEVEL_PROMPTS = {
     "min": (
         "You summarize forwarded Telegram messages. "
         "Keep the summary very close to the original: preserve most quotes and key phrases, "
-        "only lightly rewrite for clarity. Use the same language as the original messages."
+        "only lightly rewrite for clarity. Keep code blocks and inline code exactly as is. "
+        "Use the same language as the original messages."
     ),
     "mid": (
         "You summarize forwarded Telegram messages. "

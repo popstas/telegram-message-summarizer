@@ -29,7 +29,7 @@ def _hard_split_mdv2(line: str, limit: int) -> list[str]:
     chunks: list[str] = []
     buf: list[str] = []
     buf_len = 0
-    open_markers: list[str] = []  # stack of '*' / '_'
+    open_markers: list[str] = []  # stack of '*' / '_' / '`'
     i = 0
     while i < len(line):
         # Determine the atomic token at position i
@@ -44,7 +44,7 @@ def _hard_split_mdv2(line: str, limit: int) -> list[str]:
         # reserve that extra byte now to keep the chunk within limit.
         closing = "".join(reversed(open_markers))
         extra = 0
-        if token in ("*", "_"):
+        if token in ("*", "_", "`"):
             if not (open_markers and open_markers[-1] == token):
                 extra = 1  # token opens a new marker
         needed = len(token) + len(closing) + extra
@@ -57,7 +57,7 @@ def _hard_split_mdv2(line: str, limit: int) -> list[str]:
                 # or ** which Telegram interprets as underline/different
                 # formatting.  Defer those markers to the next chunk.
                 deferred: list[str] = []
-                while open_markers and buf and buf[-1] in ("*", "_") and buf[-1] == open_markers[-1]:
+                while open_markers and buf and buf[-1] in ("*", "_", "`") and buf[-1] == open_markers[-1]:
                     deferred.append(open_markers.pop())
                     buf.pop()
                     buf_len -= 1
@@ -73,14 +73,14 @@ def _hard_split_mdv2(line: str, limit: int) -> list[str]:
             # the chunk would start with e.g. "__" which Telegram reads
             # as underline, not "reopen italic + close italic".  Drop
             # each such marker instead of reopening+closing it.
-            if token in ("*", "_") and open_markers and open_markers[-1] == token:
+            if token in ("*", "_", "`") and open_markers and open_markers[-1] == token:
                 open_markers.pop()
                 # Continue consuming consecutive closing markers
                 next_i = i + len(token)
                 while (
                     open_markers
                     and next_i < len(line)
-                    and line[next_i] in ("*", "_")
+                    and line[next_i] in ("*", "_", "`")
                     and line[next_i] == open_markers[-1]
                 ):
                     open_markers.pop()
@@ -97,8 +97,8 @@ def _hard_split_mdv2(line: str, limit: int) -> list[str]:
             buf.append(token)
             buf_len += len(token)
 
-        # Track formatting markers (only non-escaped * and _)
-        if token in ("*", "_"):
+        # Track formatting markers (only non-escaped *, _, and `)
+        if token in ("*", "_", "`"):
             if open_markers and open_markers[-1] == token:
                 open_markers.pop()
             else:
