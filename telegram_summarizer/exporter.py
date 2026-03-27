@@ -27,6 +27,33 @@ def _escape_tlg(text: str) -> str:
     return "".join(result)
 
 
+def _convert_inline(text: str) -> str:
+    """Convert inline markdown (bold, italic) and escape the rest."""
+    # Split on bold **text** first
+    bold_parts = re.split(r"\*\*(.+?)\*\*", text)
+    result = []
+    for i, part in enumerate(bold_parts):
+        if i % 2 == 1:
+            # Bold content — convert to *text*
+            result.append(f"*{_convert_italic(part)}*")
+        else:
+            result.append(_convert_italic(part))
+    return "".join(result)
+
+
+def _convert_italic(text: str) -> str:
+    """Convert _italic_ markers and escape the rest."""
+    parts = re.split(r"(?<!\w)_(.+?)_(?!\w)", text)
+    result = []
+    for i, part in enumerate(parts):
+        if i % 2 == 1:
+            # Italic content
+            result.append(f"_{_escape_tlg(part)}_")
+        else:
+            result.append(_escape_tlg(part))
+    return "".join(result)
+
+
 def export_tlg(summary_text: str) -> str:
     """Convert standard markdown to Telegram MarkdownV2 format."""
     lines = summary_text.split("\n")
@@ -35,28 +62,21 @@ def export_tlg(summary_text: str) -> str:
         # Convert headings: # Heading → *Heading*
         heading_match = re.match(r"^(#{1,3})\s+(.*)", line)
         if heading_match:
-            heading_text = _escape_tlg(heading_match.group(2).strip())
+            # Strip bold markers since the whole heading is already bold
+            raw = re.sub(r"\*\*(.+?)\*\*", r"\1", heading_match.group(2).strip())
+            heading_text = _convert_italic(raw)
             out.append(f"*{heading_text}*")
             continue
 
-        # Convert bold: **text** → *text*
-        # Process bold markers before escaping the rest
-        parts = re.split(r"\*\*(.+?)\*\*", line)
-        converted = []
-        for i, part in enumerate(parts):
-            if i % 2 == 1:
-                # This is bold content
-                converted.append(f"*{_escape_tlg(part)}*")
-            else:
-                # Convert bullet lists: - item → • item
-                bullet_match = re.match(r"^(\s*)-\s+(.*)", part)
-                if bullet_match and i == 0:
-                    indent = bullet_match.group(1)
-                    rest = _escape_tlg(bullet_match.group(2))
-                    converted.append(f"{indent}• {rest}")
-                else:
-                    converted.append(_escape_tlg(part))
-        out.append("".join(converted))
+        # Convert bold/italic and escape the rest
+        # Check for bullet lists first
+        bullet_match = re.match(r"^(\s*)-\s+(.*)", line)
+        if bullet_match:
+            indent = bullet_match.group(1)
+            rest = _convert_inline(bullet_match.group(2))
+            out.append(f"{indent}• {rest}")
+        else:
+            out.append(_convert_inline(line))
 
     return "\n".join(out)
 

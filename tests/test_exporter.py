@@ -68,6 +68,24 @@ class TestExportTlg:
             result = export_tlg(f"a{ch}b")
             assert f"a\\{ch}b" in result
 
+    def test_italic_converted(self):
+        assert export_tlg("some _italic_ text") == "some _italic_ text"
+
+    def test_italic_with_special_chars(self):
+        assert export_tlg("_hello.world_") == "_hello\\.world_"
+
+    def test_bold_and_italic(self):
+        result = export_tlg("**bold** and _italic_")
+        assert result == "*bold* and _italic_"
+
+    def test_heading_with_inline_bold(self):
+        result = export_tlg("# Hello **world**")
+        assert result == "*Hello world*"
+
+    def test_bullet_with_bold(self):
+        result = export_tlg("- **bold** item")
+        assert result == "• *bold* item"
+
 
 class TestExportPdf:
     def test_returns_bytes(self):

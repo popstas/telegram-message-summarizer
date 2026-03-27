@@ -4,8 +4,10 @@ import pytest
 
 from telegram_summarizer.handlers import (
     UserSession,
+    _hard_split_mdv2,
     _last_processed,
     _sessions,
+    _split_text_by_lines,
     build_form_keyboard,
     callback_handler,
     clear_session,
@@ -1004,3 +1006,131 @@ class TestReprocessCommandHandler:
         assert _last_processed[123]["fmt"] == "docx"
         assert _last_processed[123]["style"] == "original"
         assert _last_processed[123]["save_media"] is True
+
+
+class TestHardSplitMdv2:
+    """Tests for MarkdownV2-aware hard splitting."""
+
+    def test_escape_sequence_not_split(self):
+        """Backslash-escaped char must stay together."""
+        # 10-char limit; line is: \. repeated = 12 chars escaped
+        line = "\\." * 6  # 12 chars
+        chunks = _hard_split_mdv2(line, 10)
+        for chunk in chunks:
+            # No chunk should end with a lone backslash
+            assert not chunk.endswith("\\") or chunk.endswith("\\\\")
+
+    def test_bold_markers_closed_and_reopened(self):
+        """Bold *...* spans are closed at chunk boundary and reopened."""
+        # Build a line: *<content>* where content is long
+        inner = "a" * 20
+        line = f"*{inner}*"  # 22 chars
+        chunks = _hard_split_mdv2(line, 10)
+        for chunk in chunks:
+            # Each chunk should have balanced * markers
+            assert chunk.count("*") % 2 == 0, f"Unbalanced * in chunk: {chunk!r}"
+
+    def test_italic_markers_closed_and_reopened(self):
+        """Italic _..._ spans are closed at chunk boundary and reopened."""
+        inner = "b" * 20
+        line = f"_{inner}_"
+        chunks = _hard_split_mdv2(line, 10)
+        for chunk in chunks:
+            assert chunk.count("_") % 2 == 0, f"Unbalanced _ in chunk: {chunk!r}"
+
+    def test_all_content_preserved(self):
+        """Splitting and rejoining (stripping added markers) preserves content."""
+        line = "\\." * 2048  # 4096 chars
+        chunks = _hard_split_mdv2(line, 4096)
+        joined = "".join(chunks)
+        assert joined == line
+
+    def test_short_line_single_chunk(self):
+        """Lines within the limit come back as a single chunk."""
+        line = "hello"
+        chunks = _hard_split_mdv2(line, 100)
+        assert chunks == ["hello"]
+
+    def test_nested_markers_near_boundary(self):
+        """Opening a new marker near the limit must not produce over-limit chunks."""
+        # Fill buffer to limit-1, then open * which needs 1 char for the marker
+        # plus 1 reserved for closing.  Next token _ should trigger a flush
+        # whose chunk length stays within limit.
+        limit = 20
+        # 18 chars of content + * (opens bold) + _ (opens italic) + more
+        line = "a" * (limit - 2) + "*_bbbbbb_*"
+        chunks = _hard_split_mdv2(line, limit)
+        for idx, chunk in enumerate(chunks):
+            assert len(chunk) <= limit, f"Chunk {idx} has length {len(chunk)} > {limit}: {chunk!r}"
+
+    def test_nested_markers_at_telegram_limit(self):
+        """Realistic case: long bold+italic content at 4096 boundary."""
+        limit = 4096
+        # Bold wrapping with italic inside, exceeding limit
+        inner = "a" * (limit - 3) + "_b_"
+        line = f"*{inner}*"
+        chunks = _hard_split_mdv2(line, limit)
+        for idx, chunk in enumerate(chunks):
+            assert len(chunk) <= limit, f"Chunk {idx} has length {len(chunk)} > {limit}: {chunk!r}"
+
+    def test_codex_repro_escaped_dot(self):
+        """Repro from Codex review: 'a'*4095 + '.' via export_tlg."""
+        from telegram_summarizer.exporter import export_tlg
+
+        text = "a" * 4095 + "."
+        tlg = export_tlg(text)
+        # The dot gets escaped to \. so total is 4097 chars
+        assert len(tlg) == 4097
+        chunks = _split_text_by_lines(tlg, 4096)
+        for chunk in chunks:
+            # No chunk ends with dangling backslash
+            stripped = chunk.rstrip("\\")
+            if len(stripped) < len(chunk):
+                # Had trailing backslashes — must be even count
+                assert (len(chunk) - len(stripped)) % 2 == 0
+
+    def test_closing_marker_immediately_after_flush(self):
+        """Closing _ right after a chunk flush must not produce __ (underline)."""
+        # Build _<8188 a's>_ = 8190 chars; split at 4096
+        inner = "a" * 8188
+        line = f"_{inner}_"
+        chunks = _hard_split_mdv2(line, 4096)
+        for idx, chunk in enumerate(chunks):
+            assert len(chunk) <= 4096, f"Chunk {idx} over limit: {len(chunk)}"
+        # No chunk should be just "__" (Telegram underline syntax)
+        for idx, chunk in enumerate(chunks):
+            assert chunk != "__", f"Chunk {idx} is '__' (underline, not italic close)"
+        # All content must be preserved when markers are stripped
+        joined = "".join(chunks)
+        content = joined.replace("*", "").replace("_", "")
+        assert content == inner
+
+    def test_nested_bold_italic_no_doubled_markers(self):
+        """Bold wrapping italic near boundary must not produce __ at chunk end."""
+        from telegram_summarizer.exporter import export_tlg
+
+        text = "**" + "a" * 4091 + " _b_" + "**"
+        tlg = export_tlg(text)
+        chunks = _split_text_by_lines(tlg, 4096)
+        for idx, chunk in enumerate(chunks):
+            assert len(chunk) <= 4096, f"Chunk {idx} over limit: {len(chunk)}"
+            # No chunk should end with __ before closing * (doubled marker)
+            assert "__*" not in chunk[-4:], f"Chunk {idx} ends with doubled __ marker: {chunk[-10:]!r}"
+        # Content preserved
+        joined = "".join(chunks).replace("*", "").replace("_", "")
+        assert joined == "a" * 4091 + " b"
+
+    def test_nested_bold_italic_no_empty_final_chunk(self):
+        """Consecutive closing markers after flush must not produce empty ** chunk."""
+        from telegram_summarizer.exporter import export_tlg
+
+        text = "**_" + "a" * 8184 + "_**"
+        tlg = export_tlg(text)
+        chunks = _split_text_by_lines(tlg, 4096)
+        for idx, chunk in enumerate(chunks):
+            assert len(chunk) <= 4096, f"Chunk {idx} over limit: {len(chunk)}"
+            # No chunk should be just ** (empty bold)
+            assert chunk != "**", f"Chunk {idx} is empty bold '**'"
+        # Content preserved
+        joined = "".join(chunks).replace("*", "").replace("_", "")
+        assert joined == "a" * 8184
