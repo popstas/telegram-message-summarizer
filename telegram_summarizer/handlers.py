@@ -147,10 +147,10 @@ def _split_text_by_lines(text: str, limit: int) -> list[str]:
 class UserSession:
     messages: list[str] = field(default_factory=list)
     media_file_ids: list[dict] = field(default_factory=list)
-    level: str = "mid"
-    fmt: str = "markdown"
-    style: str = "instruction"
-    save_media: bool = False
+    level: str = "min"
+    fmt: str = "tlg"
+    style: str = "original"
+    save_media: bool = True
     batch_task: asyncio.Task | None = field(default=None, repr=False)
 
 
@@ -362,7 +362,7 @@ async def reprocess_command_handler(update: Update, context: ContextTypes.DEFAUL
     session.media_file_ids = [dict(m) for m in data["media_file_ids"]]
     session.level = data["level"]
     session.fmt = data["fmt"]
-    session.style = data.get("style", "instruction")
+    session.style = data.get("style", "original")
     session.save_media = data["save_media"]
 
     text = _build_form_text(session)

@@ -65,10 +65,10 @@ class TestUserSession:
     def test_get_session_creates_new(self):
         session = get_session(1)
         assert session.messages == []
-        assert session.level == "mid"
-        assert session.fmt == "markdown"
-        assert session.style == "instruction"
-        assert session.save_media is False
+        assert session.level == "min"
+        assert session.fmt == "tlg"
+        assert session.style == "original"
+        assert session.save_media is True
 
     def test_get_session_returns_existing(self):
         session1 = get_session(1)
@@ -94,21 +94,21 @@ class TestBuildFormKeyboard:
 
         assert len(rows) == 6  # level, format, style, media, confirm, help
 
-        # Level row - mid selected
+        # Level row - min selected
         level_texts = [b.text for b in rows[0]]
-        assert level_texts == ["Min", "[Mid]", "Max"]
+        assert level_texts == ["[Min]", "Mid", "Max"]
 
-        # Format row - markdown selected
+        # Format row - tlg selected
         fmt_texts = [b.text for b in rows[1]]
-        assert fmt_texts == ["[MD]", "TLG", "PDF", "DOCX"]
+        assert fmt_texts == ["MD", "[TLG]", "PDF", "DOCX"]
 
-        # Style row - instruction selected
+        # Style row - original selected
         style_texts = [b.text for b in rows[2]]
-        assert style_texts == ["Keep original", "Summary", "[Instruction]", "Blog"]
+        assert style_texts == ["[Keep original]", "Summary", "Instruction", "Blog"]
 
-        # Media row - no selected
+        # Media row - yes selected
         media_texts = [b.text for b in rows[3]]
-        assert media_texts == ["Use media", "[no media]"]
+        assert media_texts == ["[Use media]", "no media"]
 
         # Confirm
         assert rows[4][0].text == "Confirm"
@@ -491,7 +491,7 @@ class TestCallbackHandler:
         context = make_context()
         await callback_handler(update, context)
         session = get_session(123)
-        assert session.style == "instruction"  # Default unchanged
+        assert session.style == "original"  # Default unchanged
 
     @pytest.mark.asyncio
     async def test_help_includes_styles(self):
@@ -539,7 +539,7 @@ class TestCallbackHandler:
         context = make_context()
         await callback_handler(update, context)
         session = get_session(123)
-        assert session.level == "mid"  # Default unchanged
+        assert session.level == "min"  # Default unchanged
 
     @pytest.mark.asyncio
     async def test_format_change_tlg(self):
@@ -558,7 +558,7 @@ class TestCallbackHandler:
         context = make_context()
         await callback_handler(update, context)
         session = get_session(123)
-        assert session.fmt == "markdown"  # Default unchanged
+        assert session.fmt == "tlg"  # Default unchanged
 
     @pytest.mark.asyncio
     async def test_confirm_limit_exceeded(self):
@@ -965,7 +965,7 @@ class TestReprocessCommandHandler:
         await reprocess_command_handler(update, context)
 
         session = get_session(123)
-        assert session.style == "instruction"
+        assert session.style == "original"
 
     @pytest.mark.asyncio
     async def test_last_processed_saved_after_confirm(self):
