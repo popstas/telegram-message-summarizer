@@ -48,6 +48,17 @@ def clear_session(user_id: int) -> None:
         session.batch_task.cancel()
 
 
+async def clear_command_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = update.effective_user.id
+    session = _sessions.get(user_id)
+    count = len(session.messages) if session else 0
+    clear_session(user_id)
+    if count:
+        await update.message.reply_text(f"Cleared {count} cached message(s).")
+    else:
+        await update.message.reply_text("No cached messages to clear.")
+
+
 def build_form_keyboard(session: UserSession) -> InlineKeyboardMarkup:
     level_labels = {"min": "Min", "mid": "Mid", "max": "Max"}
     level_buttons = []
