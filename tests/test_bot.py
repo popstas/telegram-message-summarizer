@@ -55,4 +55,4 @@ async def test_set_bot_commands_calls_api():
     mock_app.bot.set_my_commands.assert_called_once()
     commands = mock_app.bot.set_my_commands.call_args[0][0]
     command_names = [c.command for c in commands]
-    assert command_names == ["start", "process", "reprocess", "stats"]
+    assert command_names == ["start", "process", "reprocess", "clear", "stats"]
