@@ -74,8 +74,8 @@ Add a new "TLG" output format that sends the summary as a Telegram message with 
 
 ### Task 5: Update documentation
 
-- [ ] Update README.md to mention TLG format
-- [ ] Update CLAUDE.md if format list is mentioned
+- [x] Update README.md to mention TLG format
+- [x] Update CLAUDE.md if format list is mentioned
 
 ## Technical Details
 

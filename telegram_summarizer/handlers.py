@@ -19,6 +19,130 @@ logger = logging.getLogger(__name__)
 BATCH_TIMEOUT_SECONDS = 3
 
 
+def _hard_split_mdv2(line: str, limit: int) -> list[str]:
+    """Split a single long MarkdownV2 line into chunks respecting escape sequences.
+
+    Never splits between ``\\`` and the character it escapes.  Tracks open
+    formatting markers (``*`` and ``_``) and closes them at chunk boundaries,
+    reopening on the next chunk so Telegram sees valid MarkdownV2 in every part.
+    """
+    chunks: list[str] = []
+    buf: list[str] = []
+    buf_len = 0
+    open_markers: list[str] = []  # stack of '*' / '_'
+    i = 0
+    while i < len(line):
+        # Determine the atomic token at position i
+        if line[i] == "\\" and i + 1 < len(line):
+            token = line[i : i + 2]
+        else:
+            token = line[i]
+
+        # Space needed: token itself + potential closing markers if we flush.
+        # If the token would open a new formatting marker, the closing
+        # sequence after this token will be one character longer, so
+        # reserve that extra byte now to keep the chunk within limit.
+        closing = "".join(reversed(open_markers))
+        extra = 0
+        if token in ("*", "_"):
+            if not (open_markers and open_markers[-1] == token):
+                extra = 1  # token opens a new marker
+        needed = len(token) + len(closing) + extra
+        if buf_len + needed > limit and buf:
+            # Flush: close open markers
+            if open_markers:
+                # Avoid doubled markers at flush boundary: if the last
+                # buf entries are bare opening markers with no content
+                # after them, the closing sequence would produce e.g. __
+                # or ** which Telegram interprets as underline/different
+                # formatting.  Defer those markers to the next chunk.
+                deferred: list[str] = []
+                while open_markers and buf and buf[-1] in ("*", "_") and buf[-1] == open_markers[-1]:
+                    deferred.append(open_markers.pop())
+                    buf.pop()
+                    buf_len -= 1
+                closing = "".join(reversed(open_markers))
+                if closing:
+                    buf.append(closing)
+                # Restore deferred markers for tracking in next chunk
+                open_markers.extend(reversed(deferred))
+            if buf:
+                chunks.append("".join(buf))
+            # Reopen markers for next chunk.
+            # If the very next token(s) close reopened markers,
+            # the chunk would start with e.g. "__" which Telegram reads
+            # as underline, not "reopen italic + close italic".  Drop
+            # each such marker instead of reopening+closing it.
+            if token in ("*", "_") and open_markers and open_markers[-1] == token:
+                open_markers.pop()
+                # Continue consuming consecutive closing markers
+                next_i = i + len(token)
+                while (
+                    open_markers
+                    and next_i < len(line)
+                    and line[next_i] in ("*", "_")
+                    and line[next_i] == open_markers[-1]
+                ):
+                    open_markers.pop()
+                    next_i += 1
+                reopening = "".join(open_markers)
+                buf = [reopening] if reopening else []
+                buf_len = len(reopening)
+                i = next_i
+                continue
+            reopening = "".join(open_markers)
+            buf = [reopening, token] if reopening else [token]
+            buf_len = len(reopening) + len(token)
+        else:
+            buf.append(token)
+            buf_len += len(token)
+
+        # Track formatting markers (only non-escaped * and _)
+        if token in ("*", "_"):
+            if open_markers and open_markers[-1] == token:
+                open_markers.pop()
+            else:
+                open_markers.append(token)
+
+        i += len(token)
+
+    if buf:
+        chunks.append("".join(buf))
+    return chunks
+
+
+def _split_text_by_lines(text: str, limit: int) -> list[str]:
+    """Split text into chunks on newline boundaries, each within *limit* chars.
+
+    Falls back to MarkdownV2-aware character splitting for individual lines
+    that exceed *limit*.
+    """
+    lines = text.split("\n")
+    chunks: list[str] = []
+    current: list[str] = []
+    current_len = 0
+    for line in lines:
+        # If a single line exceeds the limit, flush current and hard-split the line
+        if len(line) > limit:
+            if current:
+                chunks.append("\n".join(current))
+                current = []
+                current_len = 0
+            chunks.extend(_hard_split_mdv2(line, limit))
+            continue
+        added_len = (len(line) + 1) if current else len(line)  # +1 for \n separator
+        if current and current_len + added_len > limit:
+            chunks.append("\n".join(current))
+            current = [line]
+            current_len = len(line)
+        else:
+            current.append(line)
+            current_len += added_len
+    if current:
+        chunks.append("\n".join(current))
+    return chunks
+
+
 @dataclass
 class UserSession:
     messages: list[str] = field(default_factory=list)
@@ -381,9 +505,10 @@ async def _process_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, u
                     parse_mode="MarkdownV2",
                 )
                 # Send remaining media separately (skip first photo used as caption)
-                first_photo_id = photos[0]["file_id"]
+                skipped_first = False
                 for media in session.media_file_ids:
-                    if media["type"] == "photo" and media["file_id"] == first_photo_id:
+                    if not skipped_first and media["type"] == "photo" and media["file_id"] == photos[0]["file_id"]:
+                        skipped_first = True
                         continue
                     if media["type"] == "photo":
                         await query.message.reply_photo(media["file_id"])
@@ -392,9 +517,10 @@ async def _process_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, u
             else:
                 # Send text as message(s), media separately
                 if len(tlg_text) > TELEGRAM_MSG_LIMIT:
-                    await query.edit_message_text(tlg_text[:TELEGRAM_MSG_LIMIT], parse_mode="MarkdownV2")
-                    for i in range(TELEGRAM_MSG_LIMIT, len(tlg_text), TELEGRAM_MSG_LIMIT):
-                        await query.message.reply_text(tlg_text[i : i + TELEGRAM_MSG_LIMIT], parse_mode="MarkdownV2")
+                    chunks = _split_text_by_lines(tlg_text, TELEGRAM_MSG_LIMIT)
+                    await query.edit_message_text(chunks[0], parse_mode="MarkdownV2")
+                    for chunk in chunks[1:]:
+                        await query.message.reply_text(chunk, parse_mode="MarkdownV2")
                 else:
                     await query.edit_message_text(tlg_text, parse_mode="MarkdownV2")
                 # Send media separately if enabled
