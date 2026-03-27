@@ -191,13 +191,13 @@ def build_form_keyboard(session: UserSession) -> InlineKeyboardMarkup:
         text = f"[{label}]" if session.level == key else label
         level_buttons.append(InlineKeyboardButton(text, callback_data=f"level:{key}"))
 
-    fmt_labels = {"markdown": "MD", "tlg": "TLG", "pdf": "PDF", "docx": "DOCX"}
+    fmt_labels = {"tlg": "TLG", "markdown": "MD", "pdf": "PDF", "docx": "DOCX"}
     fmt_buttons = []
     for key, label in fmt_labels.items():
         text = f"[{label}]" if session.fmt == key else label
         fmt_buttons.append(InlineKeyboardButton(text, callback_data=f"fmt:{key}"))
 
-    style_labels = {"original": "Keep original", "summary": "Summary", "instruction": "Instruction", "blog": "Blog"}
+    style_labels = {"original": "Original", "summary": "Summary", "instruction": "Instruction", "blog": "Blog"}
     style_buttons = []
     for key, label in style_labels.items():
         text = f"[{label}]" if session.style == key else label

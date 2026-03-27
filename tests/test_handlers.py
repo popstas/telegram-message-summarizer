@@ -100,11 +100,11 @@ class TestBuildFormKeyboard:
 
         # Format row - tlg selected
         fmt_texts = [b.text for b in rows[1]]
-        assert fmt_texts == ["MD", "[TLG]", "PDF", "DOCX"]
+        assert fmt_texts == ["[TLG]", "MD", "PDF", "DOCX"]
 
         # Style row - original selected
         style_texts = [b.text for b in rows[2]]
-        assert style_texts == ["[Keep original]", "Summary", "Instruction", "Blog"]
+        assert style_texts == ["[Original]", "Summary", "Instruction", "Blog"]
 
         # Media row - yes selected
         media_texts = [b.text for b in rows[3]]
@@ -122,10 +122,10 @@ class TestBuildFormKeyboard:
         assert level_texts == ["Min", "Mid", "[Max]"]
 
         fmt_texts = [b.text for b in rows[1]]
-        assert fmt_texts == ["MD", "TLG", "[PDF]", "DOCX"]
+        assert fmt_texts == ["TLG", "MD", "[PDF]", "DOCX"]
 
         style_texts = [b.text for b in rows[2]]
-        assert style_texts == ["Keep original", "Summary", "Instruction", "[Blog]"]
+        assert style_texts == ["Original", "Summary", "Instruction", "[Blog]"]
 
         media_texts = [b.text for b in rows[3]]
         assert media_texts == ["[Use media]", "no media"]
@@ -138,8 +138,8 @@ class TestBuildFormKeyboard:
         assert rows[0][0].callback_data == "level:min"
         assert rows[0][1].callback_data == "level:mid"
         assert rows[0][2].callback_data == "level:max"
-        assert rows[1][0].callback_data == "fmt:markdown"
-        assert rows[1][1].callback_data == "fmt:tlg"
+        assert rows[1][0].callback_data == "fmt:tlg"
+        assert rows[1][1].callback_data == "fmt:markdown"
         assert rows[1][2].callback_data == "fmt:pdf"
         assert rows[1][3].callback_data == "fmt:docx"
         assert rows[2][0].callback_data == "style:original"
@@ -155,28 +155,28 @@ class TestBuildFormKeyboard:
         keyboard = build_form_keyboard(session)
         rows = keyboard.inline_keyboard
         fmt_texts = [b.text for b in rows[1]]
-        assert fmt_texts == ["MD", "[TLG]", "PDF", "DOCX"]
+        assert fmt_texts == ["[TLG]", "MD", "PDF", "DOCX"]
 
     def test_style_original_selected(self):
         session = UserSession(style="original")
         keyboard = build_form_keyboard(session)
         rows = keyboard.inline_keyboard
         style_texts = [b.text for b in rows[2]]
-        assert style_texts == ["[Keep original]", "Summary", "Instruction", "Blog"]
+        assert style_texts == ["[Original]", "Summary", "Instruction", "Blog"]
 
     def test_style_instruction_selected(self):
         session = UserSession(style="instruction")
         keyboard = build_form_keyboard(session)
         rows = keyboard.inline_keyboard
         style_texts = [b.text for b in rows[2]]
-        assert style_texts == ["Keep original", "Summary", "[Instruction]", "Blog"]
+        assert style_texts == ["Original", "Summary", "[Instruction]", "Blog"]
 
     def test_style_blog_selected(self):
         session = UserSession(style="blog")
         keyboard = build_form_keyboard(session)
         rows = keyboard.inline_keyboard
         style_texts = [b.text for b in rows[2]]
-        assert style_texts == ["Keep original", "Summary", "Instruction", "[Blog]"]
+        assert style_texts == ["Original", "Summary", "Instruction", "[Blog]"]
 
 
 class TestStartHandler:
