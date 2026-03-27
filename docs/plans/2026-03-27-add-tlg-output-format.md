@@ -32,45 +32,45 @@ Add a new "TLG" output format that sends the summary as a Telegram message with 
 
 **Files:** `telegram_summarizer/exporter.py`, `tests/test_exporter.py`
 
-- [ ] Add `export_tlg(summary_text: str) -> str` function that converts standard markdown to Telegram MarkdownV2:
+- [x] Add `export_tlg(summary_text: str) -> str` function that converts standard markdown to Telegram MarkdownV2:
   - Escape special chars: `_`, `*`, `[`, `]`, `(`, `)`, `~`, `` ` ``, `>`, `#`, `+`, `-`, `=`, `|`, `{`, `}`, `.`, `!`
   - Convert `# Heading` → `*Heading*` (bold)
   - Convert `**bold**` → `*bold*`
   - Convert `_italic_` → `_italic_`
   - Handle bullet lists (`- item` → `• item`)
-- [ ] Write tests for `export_tlg`: headings, escaping special chars, bullet lists, plain text
-- [ ] Run tests — must pass before next task
+- [x] Write tests for `export_tlg`: headings, escaping special chars, bullet lists, plain text
+- [x] Run tests — must pass before next task
 
 ### Task 2: Add TLG format to form UI and validation
 
 **Files:** `telegram_summarizer/handlers.py`, `tests/test_handlers.py`
 
-- [ ] Add `"tlg"` to `VALID_FORMATS` set (line 13)
-- [ ] Add `"tlg": "TLG"` to `format_labels` dict (line 58), position after `"markdown"`
-- [ ] Update help text to describe TLG format
-- [ ] Write/update tests for keyboard layout with new TLG button
-- [ ] Write/update tests for callback data validation with `"tlg"` format
-- [ ] Run tests — must pass before next task
+- [x] Add `"tlg"` to `VALID_FORMATS` set (line 13)
+- [x] Add `"tlg": "TLG"` to `format_labels` dict (line 58), position after `"markdown"`
+- [x] Update help text to describe TLG format
+- [x] Write/update tests for keyboard layout with new TLG button
+- [x] Write/update tests for callback data validation with `"tlg"` format
+- [x] Run tests — must pass before next task
 
 ### Task 3: Implement TLG sending logic in _process_summary
 
 **Files:** `telegram_summarizer/handlers.py`, `tests/test_handlers.py`
 
-- [ ] Add `TELEGRAM_CAPTION_LIMIT = 1024` constant
-- [ ] Add TLG format branch in `_process_summary` (after markdown, before pdf):
+- [x] Add `TELEGRAM_CAPTION_LIMIT = 1024` constant
+- [x] Add TLG format branch in `_process_summary` (after markdown, before pdf):
   - Call `export_tlg(result.text)` to get MarkdownV2 text
   - If `save_media` and photos exist and text ≤ 1024 chars: send first photo with caption (parse_mode=MarkdownV2), send remaining media separately
   - Otherwise: send text as message with parse_mode=MarkdownV2 (split if >4096), then send media separately if enabled
-- [ ] Update media sending condition: allow media for TLG format (remove `fmt != "markdown"` check, replace with appropriate logic)
-- [ ] Write tests for TLG sending: short text with photo (caption), long text with photo (separate), no media, text splitting
-- [ ] Run tests — must pass before next task
+- [x] Update media sending condition: allow media for TLG format (remove `fmt != "markdown"` check, replace with appropriate logic)
+- [x] Write tests for TLG sending: short text with photo (caption), long text with photo (separate), no media, text splitting
+- [x] Run tests — must pass before next task
 
 ### Task 4: Verify acceptance criteria
 
-- [ ] Verify all formats work: markdown, tlg, pdf, docx
-- [ ] Verify media attachment in TLG: short text → photo caption, long text → separate messages
-- [ ] Run full test suite
-- [ ] Run linter (`ruff check .` and `ruff format --check .`)
+- [x] Verify all formats work: markdown, tlg, pdf, docx
+- [x] Verify media attachment in TLG: short text → photo caption, long text → separate messages
+- [x] Run full test suite
+- [x] Run linter (`ruff check .` and `ruff format --check .`)
 
 ### Task 5: Update documentation
 
