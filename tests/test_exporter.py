@@ -2,7 +2,7 @@ import io
 
 from docx import Document
 
-from telegram_summarizer.exporter import export_docx, export_markdown, export_pdf
+from telegram_summarizer.exporter import export_docx, export_markdown, export_pdf, export_tlg
 
 
 class TestExportMarkdown:
@@ -16,6 +16,57 @@ class TestExportMarkdown:
     def test_preserves_unicode(self):
         text = "Привет мир! 你好世界 🌍"
         assert export_markdown(text) == text
+
+
+class TestExportTlg:
+    def test_plain_text_escapes_special_chars(self):
+        assert export_tlg("hello.world!") == "hello\\.world\\!"
+
+    def test_heading_converted_to_bold(self):
+        assert export_tlg("# Title") == "*Title*"
+
+    def test_heading_level2(self):
+        assert export_tlg("## Subtitle") == "*Subtitle*"
+
+    def test_heading_escapes_special_chars(self):
+        assert export_tlg("# Hello.World!") == "*Hello\\.World\\!*"
+
+    def test_bold_converted(self):
+        assert export_tlg("some **bold** text") == "some *bold* text"
+
+    def test_bold_with_special_chars(self):
+        assert export_tlg("**hello!**") == "*hello\\!*"
+
+    def test_bullet_list(self):
+        result = export_tlg("- item one\n- item two")
+        assert result == "• item one\n• item two"
+
+    def test_bullet_list_with_special_chars(self):
+        assert export_tlg("- hello.world") == "• hello\\.world"
+
+    def test_empty_string(self):
+        assert export_tlg("") == ""
+
+    def test_multiline(self):
+        text = "# Title\n\nSome text.\n\n- item"
+        result = export_tlg(text)
+        lines = result.split("\n")
+        assert lines[0] == "*Title*"
+        assert lines[1] == ""
+        assert lines[2] == "Some text\\."
+        assert lines[3] == ""
+        assert lines[4] == "• item"
+
+    def test_preserves_unicode(self):
+        text = "Привет мир! 🌍"
+        result = export_tlg(text)
+        assert "Привет мир\\!" in result
+        assert "🌍" in result
+
+    def test_all_special_chars_escaped(self):
+        for ch in "_*[]()~`>#+\\-=|{}.!":
+            result = export_tlg(f"a{ch}b")
+            assert f"a\\{ch}b" in result
 
 
 class TestExportPdf:

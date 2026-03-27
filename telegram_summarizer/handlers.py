@@ -6,12 +6,13 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
 from telegram_summarizer.config import get_user_limits
-from telegram_summarizer.exporter import export_docx, export_pdf
+from telegram_summarizer.exporter import export_docx, export_pdf, export_tlg
 from telegram_summarizer.summarizer import LEVEL_PROMPTS, STYLE_PROMPTS, summarize
 from telegram_summarizer.user_manager import NoUsernameError
 
-VALID_FORMATS = {"markdown", "pdf", "docx"}
+VALID_FORMATS = {"markdown", "tlg", "pdf", "docx"}
 TELEGRAM_MSG_LIMIT = 4096
+TELEGRAM_CAPTION_LIMIT = 1024
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,7 @@ def build_form_keyboard(session: UserSession) -> InlineKeyboardMarkup:
         text = f"[{label}]" if session.level == key else label
         level_buttons.append(InlineKeyboardButton(text, callback_data=f"level:{key}"))
 
-    fmt_labels = {"markdown": "MD", "pdf": "PDF", "docx": "DOCX"}
+    fmt_labels = {"markdown": "MD", "tlg": "TLG", "pdf": "PDF", "docx": "DOCX"}
     fmt_buttons = []
     for key, label in fmt_labels.items():
         text = f"[{label}]" if session.fmt == key else label
@@ -276,13 +277,14 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             "• *Blog* — engaging blog post with narrative style\n"
             "\n"
             "📄 *Formats:*\n"
-            "• *MD* — Telegram message\n"
+            "• *MD* — plain Telegram message\n"
+            "• *TLG* — Telegram message with MarkdownV2 formatting and inline media\n"
             "• *PDF* — PDF file\n"
             "• *DOCX* — Word file\n"
             "\n"
             "🖼 *Media:*\n"
             "Attach forwarded photos, videos, and documents to the result "
-            "(only for PDF/DOCX formats).",
+            "(for TLG/PDF/DOCX formats).",
             parse_mode="Markdown",
         )
         return
@@ -367,6 +369,41 @@ async def _process_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, u
                     await query.message.reply_text(text[i : i + TELEGRAM_MSG_LIMIT])
             else:
                 await query.edit_message_text(text)
+        elif session.fmt == "tlg":
+            tlg_text = export_tlg(result.text)
+            photos = [m for m in session.media_file_ids if m["type"] == "photo"]
+            if session.save_media and photos and len(tlg_text) <= TELEGRAM_CAPTION_LIMIT:
+                # Send first photo with caption
+                await query.edit_message_text("Here is your summary:")
+                await query.message.reply_photo(
+                    photos[0]["file_id"],
+                    caption=tlg_text,
+                    parse_mode="MarkdownV2",
+                )
+                # Send remaining media separately (skip first photo used as caption)
+                first_photo_id = photos[0]["file_id"]
+                for media in session.media_file_ids:
+                    if media["type"] == "photo" and media["file_id"] == first_photo_id:
+                        continue
+                    if media["type"] == "photo":
+                        await query.message.reply_photo(media["file_id"])
+                    elif media["type"] == "document":
+                        await query.message.reply_document(media["file_id"])
+            else:
+                # Send text as message(s), media separately
+                if len(tlg_text) > TELEGRAM_MSG_LIMIT:
+                    await query.edit_message_text(tlg_text[:TELEGRAM_MSG_LIMIT], parse_mode="MarkdownV2")
+                    for i in range(TELEGRAM_MSG_LIMIT, len(tlg_text), TELEGRAM_MSG_LIMIT):
+                        await query.message.reply_text(tlg_text[i : i + TELEGRAM_MSG_LIMIT], parse_mode="MarkdownV2")
+                else:
+                    await query.edit_message_text(tlg_text, parse_mode="MarkdownV2")
+                # Send media separately if enabled
+                if session.save_media and session.media_file_ids:
+                    for media in session.media_file_ids:
+                        if media["type"] == "photo":
+                            await query.message.reply_photo(media["file_id"])
+                        elif media["type"] == "document":
+                            await query.message.reply_document(media["file_id"])
         elif session.fmt == "pdf":
             pdf_bytes = export_pdf(result.text)
             await query.edit_message_text("Here is your summary:")
@@ -382,8 +419,8 @@ async def _process_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, u
                 filename="summary.docx",
             )
 
-        # Send media if requested (only for pdf/docx)
-        if session.save_media and session.fmt != "markdown" and session.media_file_ids:
+        # Send media if requested (only for pdf/docx; tlg handles media inline)
+        if session.save_media and session.fmt in ("pdf", "docx") and session.media_file_ids:
             for media in session.media_file_ids:
                 if media["type"] == "photo":
                     await query.message.reply_photo(media["file_id"])

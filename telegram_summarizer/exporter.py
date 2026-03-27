@@ -13,6 +13,54 @@ def export_markdown(summary_text: str) -> str:
     return summary_text
 
 
+# Characters that must be escaped in Telegram MarkdownV2
+_TLG_SPECIAL = r"_*[]()~`>#+\-=|{}.!"
+
+
+def _escape_tlg(text: str) -> str:
+    """Escape special characters for Telegram MarkdownV2."""
+    result = []
+    for ch in text:
+        if ch in _TLG_SPECIAL:
+            result.append("\\")
+        result.append(ch)
+    return "".join(result)
+
+
+def export_tlg(summary_text: str) -> str:
+    """Convert standard markdown to Telegram MarkdownV2 format."""
+    lines = summary_text.split("\n")
+    out = []
+    for line in lines:
+        # Convert headings: # Heading → *Heading*
+        heading_match = re.match(r"^(#{1,3})\s+(.*)", line)
+        if heading_match:
+            heading_text = _escape_tlg(heading_match.group(2).strip())
+            out.append(f"*{heading_text}*")
+            continue
+
+        # Convert bold: **text** → *text*
+        # Process bold markers before escaping the rest
+        parts = re.split(r"\*\*(.+?)\*\*", line)
+        converted = []
+        for i, part in enumerate(parts):
+            if i % 2 == 1:
+                # This is bold content
+                converted.append(f"*{_escape_tlg(part)}*")
+            else:
+                # Convert bullet lists: - item → • item
+                bullet_match = re.match(r"^(\s*)-\s+(.*)", part)
+                if bullet_match and i == 0:
+                    indent = bullet_match.group(1)
+                    rest = _escape_tlg(bullet_match.group(2))
+                    converted.append(f"{indent}• {rest}")
+                else:
+                    converted.append(_escape_tlg(part))
+        out.append("".join(converted))
+
+    return "\n".join(out)
+
+
 def _setup_pdf_fonts(pdf: FPDF) -> str:
     """Set up fonts, return font family name to use."""
     if os.path.exists(_DEJAVU_REGULAR) and os.path.exists(_DEJAVU_BOLD):

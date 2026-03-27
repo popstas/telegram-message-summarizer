@@ -98,7 +98,7 @@ class TestBuildFormKeyboard:
 
         # Format row - markdown selected
         fmt_texts = [b.text for b in rows[1]]
-        assert fmt_texts == ["[MD]", "PDF", "DOCX"]
+        assert fmt_texts == ["[MD]", "TLG", "PDF", "DOCX"]
 
         # Style row - instruction selected
         style_texts = [b.text for b in rows[2]]
@@ -120,7 +120,7 @@ class TestBuildFormKeyboard:
         assert level_texts == ["Min", "Mid", "[Max]"]
 
         fmt_texts = [b.text for b in rows[1]]
-        assert fmt_texts == ["MD", "[PDF]", "DOCX"]
+        assert fmt_texts == ["MD", "TLG", "[PDF]", "DOCX"]
 
         style_texts = [b.text for b in rows[2]]
         assert style_texts == ["Keep original", "Summary", "Instruction", "[Blog]"]
@@ -137,8 +137,9 @@ class TestBuildFormKeyboard:
         assert rows[0][1].callback_data == "level:mid"
         assert rows[0][2].callback_data == "level:max"
         assert rows[1][0].callback_data == "fmt:markdown"
-        assert rows[1][1].callback_data == "fmt:pdf"
-        assert rows[1][2].callback_data == "fmt:docx"
+        assert rows[1][1].callback_data == "fmt:tlg"
+        assert rows[1][2].callback_data == "fmt:pdf"
+        assert rows[1][3].callback_data == "fmt:docx"
         assert rows[2][0].callback_data == "style:original"
         assert rows[2][1].callback_data == "style:summary"
         assert rows[2][2].callback_data == "style:instruction"
@@ -146,6 +147,13 @@ class TestBuildFormKeyboard:
         assert rows[3][0].callback_data == "media:yes"
         assert rows[3][1].callback_data == "media:no"
         assert rows[4][0].callback_data == "confirm"
+
+    def test_tlg_format_selected(self):
+        session = UserSession(fmt="tlg")
+        keyboard = build_form_keyboard(session)
+        rows = keyboard.inline_keyboard
+        fmt_texts = [b.text for b in rows[1]]
+        assert fmt_texts == ["MD", "[TLG]", "PDF", "DOCX"]
 
     def test_style_original_selected(self):
         session = UserSession(style="original")
@@ -495,6 +503,7 @@ class TestCallbackHandler:
         assert "Blog" in help_text
         assert "Summary" in help_text
         assert "Styles" in help_text
+        assert "TLG" in help_text
 
     @pytest.mark.asyncio
     async def test_confirm_passes_style_to_summarize(self):
@@ -529,6 +538,16 @@ class TestCallbackHandler:
         await callback_handler(update, context)
         session = get_session(123)
         assert session.level == "mid"  # Default unchanged
+
+    @pytest.mark.asyncio
+    async def test_format_change_tlg(self):
+        get_session(123)
+        update = self._make_callback_update("fmt:tlg")
+        context = make_context()
+        await callback_handler(update, context)
+        session = get_session(123)
+        assert session.fmt == "tlg"
+        update.callback_query.edit_message_reply_markup.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_callback_invalid_format_ignored(self):
@@ -713,6 +732,178 @@ class TestCallbackHandler:
         # Session should be cleared
         new_session = get_session(123)
         assert new_session.messages == []
+
+
+class TestTlgFormat:
+    def _make_callback_update(self, data="confirm", user_id=123, username="testuser"):
+        update = MagicMock()
+        update.effective_user.id = user_id
+        update.effective_user.username = username
+        update.callback_query.data = data
+        update.callback_query.answer = AsyncMock()
+        update.callback_query.edit_message_reply_markup = AsyncMock()
+        update.callback_query.edit_message_text = AsyncMock()
+        update.callback_query.message.reply_text = AsyncMock()
+        update.callback_query.message.reply_document = AsyncMock()
+        update.callback_query.message.reply_photo = AsyncMock()
+        return update
+
+    def _setup_session(self, fmt="tlg", save_media=False, media_file_ids=None, messages=None):
+        session = get_session(123)
+        session.messages = messages or ["test message"]
+        session.fmt = fmt
+        session.save_media = save_media
+        session.media_file_ids = media_file_ids or []
+        return session
+
+    def _make_mock_result(self, text="Short summary", input_tokens=10, output_tokens=5):
+        mock_result = MagicMock()
+        mock_result.text = text
+        mock_result.input_tokens = input_tokens
+        mock_result.output_tokens = output_tokens
+        return mock_result
+
+    @pytest.mark.asyncio
+    async def test_tlg_short_text_no_media(self):
+        """TLG format with short text and no media: sends formatted text as message."""
+        self._setup_session(fmt="tlg", save_media=False)
+        update = self._make_callback_update("confirm")
+        mock_um = MagicMock()
+        mock_um.check_limits.return_value = True
+        context = make_context(user_manager=mock_um)
+        mock_result = self._make_mock_result(text="Hello world")
+
+        with patch("telegram_summarizer.handlers.summarize", new_callable=AsyncMock, return_value=mock_result):
+            await callback_handler(update, context)
+
+        # Should edit message with MarkdownV2 formatted text
+        calls = update.callback_query.edit_message_text.call_args_list
+        last_call = calls[-1]
+        assert last_call[1].get("parse_mode") == "MarkdownV2"
+        # No photos sent
+        update.callback_query.message.reply_photo.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_tlg_short_text_with_photo_caption(self):
+        """TLG format with short text and photo: sends photo with caption."""
+        self._setup_session(
+            fmt="tlg",
+            save_media=True,
+            media_file_ids=[{"type": "photo", "file_id": "photo1"}],
+        )
+        update = self._make_callback_update("confirm")
+        mock_um = MagicMock()
+        mock_um.check_limits.return_value = True
+        context = make_context(user_manager=mock_um)
+        mock_result = self._make_mock_result(text="Short")
+
+        with patch("telegram_summarizer.handlers.summarize", new_callable=AsyncMock, return_value=mock_result):
+            await callback_handler(update, context)
+
+        # Photo sent with caption
+        update.callback_query.message.reply_photo.assert_called_once()
+        call_kwargs = update.callback_query.message.reply_photo.call_args
+        assert call_kwargs[0][0] == "photo1"
+        assert call_kwargs[1]["parse_mode"] == "MarkdownV2"
+        assert "caption" in call_kwargs[1]
+
+    @pytest.mark.asyncio
+    async def test_tlg_long_text_with_photo_separate(self):
+        """TLG format with long text and photo: sends text and photo separately."""
+        long_text = "A" * 1100  # Over 1024 caption limit
+        self._setup_session(
+            fmt="tlg",
+            save_media=True,
+            media_file_ids=[{"type": "photo", "file_id": "photo1"}],
+        )
+        update = self._make_callback_update("confirm")
+        mock_um = MagicMock()
+        mock_um.check_limits.return_value = True
+        context = make_context(user_manager=mock_um)
+        mock_result = self._make_mock_result(text=long_text)
+
+        with patch("telegram_summarizer.handlers.summarize", new_callable=AsyncMock, return_value=mock_result):
+            await callback_handler(update, context)
+
+        # Text sent as message with MarkdownV2
+        calls = update.callback_query.edit_message_text.call_args_list
+        last_call = calls[-1]
+        assert last_call[1].get("parse_mode") == "MarkdownV2"
+        # Photo sent separately (without caption)
+        update.callback_query.message.reply_photo.assert_called_once_with("photo1")
+
+    @pytest.mark.asyncio
+    async def test_tlg_text_splitting(self):
+        """TLG format with very long text: splits into multiple messages."""
+        long_text = "B" * 5000  # Over 4096 message limit
+        self._setup_session(fmt="tlg", save_media=False)
+        update = self._make_callback_update("confirm")
+        mock_um = MagicMock()
+        mock_um.check_limits.return_value = True
+        context = make_context(user_manager=mock_um)
+        mock_result = self._make_mock_result(text=long_text)
+
+        with patch("telegram_summarizer.handlers.summarize", new_callable=AsyncMock, return_value=mock_result):
+            await callback_handler(update, context)
+
+        # First chunk via edit_message_text
+        edit_calls = update.callback_query.edit_message_text.call_args_list
+        # "Processing..." + first chunk = at least 2 calls
+        assert len(edit_calls) >= 2
+        # Additional chunks via reply_text
+        update.callback_query.message.reply_text.assert_called()
+        reply_call = update.callback_query.message.reply_text.call_args
+        assert reply_call[1].get("parse_mode") == "MarkdownV2"
+
+    @pytest.mark.asyncio
+    async def test_tlg_caption_with_remaining_media(self):
+        """TLG short text with multiple media: first photo as caption, rest separate."""
+        self._setup_session(
+            fmt="tlg",
+            save_media=True,
+            media_file_ids=[
+                {"type": "photo", "file_id": "photo1"},
+                {"type": "photo", "file_id": "photo2"},
+                {"type": "document", "file_id": "doc1", "file_name": "f.txt"},
+            ],
+        )
+        update = self._make_callback_update("confirm")
+        mock_um = MagicMock()
+        mock_um.check_limits.return_value = True
+        context = make_context(user_manager=mock_um)
+        mock_result = self._make_mock_result(text="Short")
+
+        with patch("telegram_summarizer.handlers.summarize", new_callable=AsyncMock, return_value=mock_result):
+            await callback_handler(update, context)
+
+        # First photo with caption + second photo separately = 2 reply_photo calls
+        assert update.callback_query.message.reply_photo.call_count == 2
+        # Document sent separately
+        update.callback_query.message.reply_document.assert_called_once_with("doc1")
+
+    @pytest.mark.asyncio
+    async def test_tlg_no_media_when_save_media_false(self):
+        """TLG format with media in session but save_media=False: no media sent."""
+        self._setup_session(
+            fmt="tlg",
+            save_media=False,
+            media_file_ids=[{"type": "photo", "file_id": "photo1"}],
+        )
+        update = self._make_callback_update("confirm")
+        mock_um = MagicMock()
+        mock_um.check_limits.return_value = True
+        context = make_context(user_manager=mock_um)
+        mock_result = self._make_mock_result(text="Short text")
+
+        with patch("telegram_summarizer.handlers.summarize", new_callable=AsyncMock, return_value=mock_result):
+            await callback_handler(update, context)
+
+        # No photos sent
+        update.callback_query.message.reply_photo.assert_not_called()
+        # Text sent with MarkdownV2
+        calls = update.callback_query.edit_message_text.call_args_list
+        last_call = calls[-1]
+        assert last_call[1].get("parse_mode") == "MarkdownV2"
 
 
 class TestReprocessCommandHandler:
