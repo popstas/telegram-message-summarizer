@@ -10,7 +10,7 @@ CONFIG_PATH = DATA_DIR / "config.yml"
 DEFAULT_CONFIG = {
     "bot_token": "",
     "openai_api_key": "",
-    "openai_model": "gpt-4.1-nano",
+    "openai_model": "gpt-5.6-luna",
     "default_limits": {
         "input_tokens": 10000,
         "output_tokens": 10000,

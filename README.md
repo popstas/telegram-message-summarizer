@@ -49,7 +49,7 @@ Configuration lives in `data/config.yml`. See `data/config.example.yml` for all 
 ```yaml
 bot_token: "YOUR_BOT_TOKEN"
 openai_api_key: "YOUR_OPENAI_API_KEY"
-openai_model: "gpt-4.1-nano"
+openai_model: "gpt-5.6-luna"
 
 default_limits:
   input_tokens: 10000

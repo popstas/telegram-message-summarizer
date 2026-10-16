@@ -458,7 +458,7 @@ async def _process_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, u
         clear_session(user_id)
         return
     try:
-        model = config.get("openai_model", "gpt-4.1-nano")
+        model = config.get("openai_model", "gpt-5.6-luna")
         result = await summarize(combined_text, session.level, style=session.style, model=model)
     except Exception as e:
         logger.error("Summarization failed: %s", e, exc_info=True)

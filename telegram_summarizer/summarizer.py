@@ -56,7 +56,7 @@ class SummaryResult:
 
 
 async def summarize(
-    messages_text: str, level: str, style: str = "instruction", model: str = "gpt-4.1-nano"
+    messages_text: str, level: str, style: str = "instruction", model: str = "gpt-5.6-luna"
 ) -> SummaryResult:
     if level not in LEVEL_PROMPTS:
         raise ValueError(f"Unknown level: {level}. Must be one of: {', '.join(LEVEL_PROMPTS)}")
